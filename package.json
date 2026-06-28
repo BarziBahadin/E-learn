@@ -3,20 +3,33 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/server": "^1.2.0",
+    "@supabase/supabase-js": "^2.108.2",
     "expo": "~56.0.12",
+    "expo-glass-effect": "~56.0.4",
     "expo-status-bar": "~56.0.4",
+    "expo-video": "~56.1.4",
+    "lucide-react-native": "^1.21.0",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.9"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "node --stack_size=65500 ./node_modules/typescript/bin/tsc --noEmit",
+    "test": "vitest run"
   },
   "private": true
 }

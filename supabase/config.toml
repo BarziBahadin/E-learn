@@ -1,0 +1,4 @@
+project_id = "duhpxuhncnopspzcuade"
+
+[functions.playback]
+verify_jwt = true
