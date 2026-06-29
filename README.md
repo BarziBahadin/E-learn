@@ -13,15 +13,19 @@ Open `http://localhost:8081`. For native development, run `pnpm ios` or `pnpm an
 
 ## Test the complete demo
 
-1. Choose Student, Teacher, or Admin, select **Send demo OTP**, then verify with `123456`.
+1. Choose Student or Teacher, select **Send demo OTP**, then verify with `123456`. Admin access is available only in the web application.
 2. As Student, use **Discover** to choose a subject and teacher, watch a free preview, or unlock a course through coupon, manual payment, or the simulated online gateway.
 3. Open an enrolled course and start secure playback. This creates a 90-second lock, audit row, and 60-second mock token.
 4. Use **Status** to manage devices, **Notifications** to read alerts, and **Support** to submit a ticket.
 5. Select **Simulate second device**, then **Force switch**, to test the one-active-device rule.
 6. As Teacher, review owned course analytics and student progress.
-7. As Admin, manage content, payments, coupons, sessions, devices, broadcasts, audit logs, and report export.
+7. On web, sign in as Admin to manage content, payments, coupons, sessions, devices, broadcasts, audit logs, and report export.
 
 The **Status** page can also take the demo Redis service offline. New playback then fails closed with `LOCK_SERVICE_UNAVAILABLE`.
+
+Protected playback includes a server-issued dynamic watermark. The player shows a masked verified phone number or server-managed username with a short session trace code and moves it to irregular positions every 5–9 seconds. The overlay is removed as soon as the playback lock expires or ends. Native fullscreen is disabled for protected video because a sibling overlay is not guaranteed to remain visible outside the app's player container.
+
+The website and student app share four one-time academic-year plans: Bronze (89,000 IQD), Silver (159,000 IQD), Gold (199,000 IQD), and Platinum VIP (690,000 IQD). Silver, Gold, and Platinum use fixed subject paths; custom multi-teacher bundles are disabled. Access remains valid through the August/September ministerial resits. The web admin Plans view shows the matching payout allocation for each tier.
 
 ## Run checks
 

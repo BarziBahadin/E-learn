@@ -261,7 +261,7 @@ async function startPlayback(userId: string, body: JsonRecord, req: Request) {
     error: redisResult.error,
   }, fingerprint);
 
-  return rpc('start_playback_lock', {
+  const fallbackResult = await rpc('start_playback_lock', {
     p_user_id: userId,
     p_device_id: deviceId,
     p_session_id: sessionId,
@@ -274,6 +274,8 @@ async function startPlayback(userId: string, body: JsonRecord, req: Request) {
     p_expires_at: expiresAt,
     p_response_playback_token: playbackToken,
   });
+
+  return attachWatermarkToSuccess(fallbackResult, userId);
 }
 
 async function heartbeat(userId: string, body: JsonRecord) {
@@ -406,6 +408,7 @@ async function forceSwitch(userId: string, body: JsonRecord, req: Request) {
         session_id: sessionId,
         lock_version: lockVersion,
         playback_token: playbackToken,
+        watermark: await watermarkForUser(userId, sessionId),
         old_session_ended: true,
         old_session_id: redisResult.data.old_session_id,
         old_device_id: redisResult.data.old_device_id,
@@ -419,7 +422,7 @@ async function forceSwitch(userId: string, body: JsonRecord, req: Request) {
     error: redisResult.error,
   }, fingerprint);
 
-  return rpc('force_switch_playback_lock', {
+  const fallbackResult = await rpc('force_switch_playback_lock', {
     p_user_id: userId,
     p_new_device_id: newDeviceId,
     p_new_session_id: sessionId,
@@ -432,6 +435,8 @@ async function forceSwitch(userId: string, body: JsonRecord, req: Request) {
     p_expires_at: expiresAt,
     p_response_playback_token: playbackToken,
   });
+
+  return attachWatermarkToSuccess(fallbackResult, userId);
 }
 
 async function endPlayback(userId: string, body: JsonRecord) {
@@ -869,19 +874,63 @@ function expiresAtIso() {
   return new Date(Date.now() + lockTtlSeconds * 1000).toISOString();
 }
 
-async function watermarkForUser(userId: string, sessionId: string) {
-  const { data } = await admin.auth.admin.getUserById(userId);
-  const user = data.user;
+async function attachWatermarkToSuccess(result: unknown, userId: string) {
+  if (!isJsonRecord(result) || result.status !== 'success' || !isJsonRecord(result.data)) {
+    return result;
+  }
+
+  const sessionId = optionalString(result.data.session_id);
+  if (!sessionId) return result;
 
   return {
-    user_name:
-      user?.user_metadata?.full_name ??
-      user?.user_metadata?.name ??
-      user?.email ??
-      'E-Lern student',
-    phone: user?.phone ?? null,
+    ...result,
+    data: {
+      ...result.data,
+      watermark: await watermarkForUser(userId, sessionId),
+    },
+  };
+}
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function watermarkForUser(userId: string, sessionId: string) {
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  const user = data.user;
+  const appMetadata = isJsonRecord(user?.app_metadata) ? user.app_metadata : {};
+  const serverManagedUsername = optionalString(appMetadata.student_username) ??
+    optionalString(appMetadata.username);
+  const verifiedPhone = user?.phone && user.phone_confirmed_at
+    ? maskPhone(user.phone)
+    : null;
+  const fallbackIdentifier = user?.email
+    ? maskEmail(user.email)
+    : `Student ${userId.slice(0, 6).toUpperCase()}`;
+  const displayText = verifiedPhone ??
+    (serverManagedUsername ? `@${serverManagedUsername.replace(/^@/, '')}` : fallbackIdentifier);
+  const traceCode = `EL-${(await hmacSha256(sessionId, tokenSecret!)).slice(0, 8).toUpperCase()}`;
+
+  if (error) {
+    console.error('Unable to load the playback watermark identity.', error.message);
+  }
+
+  return {
+    display_text: displayText,
+    trace_code: traceCode,
     session_id: sessionId,
   };
+}
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  return `•••• ${digits.slice(-4).padStart(4, '•')}`;
+}
+
+function maskEmail(email: string) {
+  const [localPart = 'student', domain = 'e-lern'] = email.split('@');
+  const visible = localPart.slice(0, Math.min(2, localPart.length));
+  return `${visible}•••@${domain}`;
 }
 
 async function createPlaybackToken(payload: JsonRecord) {

@@ -1,3 +1,5 @@
+import { createDemoWatermark, type PlaybackWatermark } from '../features/playback/watermark';
+
 export const LOCK_TTL_SECONDS = 90;
 export const HEARTBEAT_INTERVAL_SECONDS = 20;
 export const VIDEO_TOKEN_TTL_SECONDS = 60;
@@ -6,6 +8,7 @@ export type DemoUser = {
   id: 'user_123' | 'user_456' | 'user_789';
   name: string;
   email: string;
+  username: string;
   role: 'student' | 'teacher' | 'admin';
 };
 
@@ -89,6 +92,7 @@ export type StartResult =
       heartbeat_interval_seconds: number;
       video_token: string;
       video_token_expires_at_ms: number;
+      watermark: PlaybackWatermark;
     }
   | {
       allowed: false;
@@ -107,9 +111,9 @@ export type HeartbeatResult = {
 export type EngineResult<T> = { state: DemoPlaybackState; result: T };
 
 const users: DemoUser[] = [
-  { id: 'user_123', name: 'Darya Ahmed', email: 'darya@example.com', role: 'student' },
-  { id: 'user_456', name: 'Soran Karim', email: 'soran@example.com', role: 'admin' },
-  { id: 'user_789', name: 'Ahmed Hassan', email: 'ahmed.teacher@example.com', role: 'teacher' },
+  { id: 'user_123', name: 'Darya Ahmed', email: 'darya@example.com', username: 'darya.ahmed', role: 'student' },
+  { id: 'user_456', name: 'Soran Karim', email: 'soran@example.com', username: 'soran.karim', role: 'admin' },
+  { id: 'user_789', name: 'Ahmed Hassan', email: 'ahmed.teacher@example.com', username: 'ahmed.hassan', role: 'teacher' },
 ];
 
 export function createDemoState(nowMs = Date.now()): DemoPlaybackState {
@@ -258,6 +262,10 @@ export function startPlayback(
       heartbeat_interval_seconds: HEARTBEAT_INTERVAL_SECONDS,
       video_token: tokenFor(input.user_id, input.device_id, sessionId, lockVersion, state.now_ms),
       video_token_expires_at_ms: state.now_ms + VIDEO_TOKEN_TTL_SECONDS * 1000,
+      watermark: createDemoWatermark(
+        state.users.find((user) => user.id === input.user_id)?.username ?? input.user_id,
+        sessionId,
+      ),
     },
   };
 }

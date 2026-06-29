@@ -1,3 +1,5 @@
+import type { PlaybackWatermark } from './watermark';
+
 export type PlaybackLockStatus = 'success' | 'conflict' | 'blocked' | 'error';
 
 export type PlaybackLockResponse = {
@@ -10,6 +12,7 @@ export type PlaybackLockResponse = {
     current_device?: string;
     current_session?: string;
     can_force?: boolean;
+    watermark?: PlaybackWatermark;
   };
   reason?: string;
   message?: string;

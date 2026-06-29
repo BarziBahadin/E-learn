@@ -1,5 +1,4 @@
 import { useEvent } from 'expo';
-import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -94,15 +93,31 @@ import {
   teacherStudents,
   teachers,
 } from './platformDemoData';
+import LandingPage from '../landing/LandingPage';
+import { DynamicWatermark } from '../features/playback/DynamicWatermark';
+import type { PlaybackWatermark } from '../features/playback/watermark';
+import {
+  ACADEMIC_YEAR_ACCESS_MODEL,
+  formatIQD,
+  pathLabel,
+  payoutLabel,
+  pricingPlanById,
+  pricingPlans,
+  pricingSystemConstraints,
+  subjectsForPlan,
+  type AcademicSubject,
+  type PricingPlanId,
+} from '../features/pricing/academicYearPlans';
 
-type Page = 'Discover' | 'Courses' | 'Course' | 'Checkout' | 'Lesson' | 'Status' | 'Notifications' | 'Teacher' | 'Admin' | 'Profile';
-type AdminView = 'Overview' | 'Content' | 'Payments' | 'Coupons' | 'Sessions' | 'Risk events' | 'Devices' | 'Notifications' | 'Audit logs';
+type Page = 'Discover' | 'Courses' | 'Plans' | 'Course' | 'Checkout' | 'Lesson' | 'Status' | 'Notifications' | 'Teacher' | 'Admin' | 'Profile';
+type AdminView = 'Overview' | 'Content' | 'Plans' | 'Payments' | 'Coupons' | 'Sessions' | 'Risk events' | 'Devices' | 'Notifications' | 'Audit logs';
 type ClientSession = {
   sessionId: string;
   deviceId: string;
   lockVersion: number;
   videoToken: string;
   tokenExpiresAtMs: number;
+  watermark: PlaybackWatermark;
 };
 
 const VIDEO_SOURCE = require('../../assets/mixkit-hands-of-a-person-typing-on-a-cell-phone-4915-full-hd.mp4');
@@ -192,6 +207,7 @@ export default function PrototypeApp() {
   const [selectedUserId, setSelectedUserId] = useState<DemoUser['id']>('user_123');
   const [currentUser, setCurrentUser] = useState<DemoUser | null>(null);
   const [currentDevice, setCurrentDevice] = useState<DemoDevice | null>(null);
+  const [showLanding, setShowLanding] = useState(true);
   const [page, setPage] = useState<Page>('Courses');
   const [adminView, setAdminView] = useState<AdminView>('Overview');
   const [selectedCourseId, setSelectedCourseId] = useState('course_001');
@@ -211,6 +227,9 @@ export default function PrototypeApp() {
   const [selectedTeacherId, setSelectedTeacherId] = useState('teacher_ahmed');
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<string[]>(['course_001']);
   const [checkoutCourseId, setCheckoutCourseId] = useState('course_002');
+  const [selectedPricingPlanId, setSelectedPricingPlanId] = useState<PricingPlanId>('bronze');
+  const [selectedPricingPathIndex, setSelectedPricingPathIndex] = useState(0);
+  const [pendingPricingPlanId, setPendingPricingPlanId] = useState<PricingPlanId | null>(null);
   const [unlockMethod, setUnlockMethod] = useState<'Coupon' | 'Manual payment' | 'Online payment'>('Coupon');
   const [couponCode, setCouponCode] = useState('WELCOME12');
   const [notifications, setNotifications] = useState(initialNotifications);
@@ -247,6 +266,12 @@ export default function PrototypeApp() {
   const nextAvailableLesson = courseLessons(selectedCourse)
     .slice(selectedLessonIndex + 1)
     .find((lesson) => lesson.available);
+  const checkoutCourse = studentCourses.find((course) => course.id === checkoutCourseId) ?? studentCourses[0];
+  const selectedPricingPlan = pricingPlanById(selectedPricingPlanId);
+  const selectedPlanSubjects = subjectsForPlan(selectedPricingPlan, {
+    pathIndex: selectedPricingPathIndex,
+    standaloneSubject: checkoutCourse.category as AcademicSubject,
+  });
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -288,6 +313,10 @@ export default function PrototypeApp() {
     () => state.devices.filter((device) => device.user_id === currentUser?.id),
     [currentUser?.id, state.devices],
   );
+  const availableUsers = useMemo(
+    () => Platform.OS === 'web' ? state.users : state.users.filter((user) => user.role !== 'admin'),
+    [state.users],
+  );
 
   const login = useCallback(() => {
     if (authStep === 'account') {
@@ -301,6 +330,11 @@ export default function PrototypeApp() {
     }
     const user = state.users.find((item) => item.id === selectedUserId);
     if (!user) return;
+    if (user.role === 'admin' && Platform.OS !== 'web') {
+      setNotice('Admin access is available only in the E-Lern web application.');
+      setSelectedUserId('user_123');
+      return;
+    }
     const registered = registerDevice(state, {
       user_id: user.id,
       device_name: isIOS ? 'This iPhone' : 'Chrome on Mac',
@@ -309,9 +343,9 @@ export default function PrototypeApp() {
     setState(registered.state);
     setCurrentUser(user);
     setCurrentDevice(registered.result);
-    setPage(user.role === 'admin' ? 'Admin' : user.role === 'teacher' ? 'Teacher' : 'Discover');
+    setPage(user.role === 'admin' ? 'Admin' : user.role === 'teacher' ? 'Teacher' : pendingPricingPlanId ? 'Checkout' : 'Discover');
     setNotice('');
-  }, [authStep, otp, selectedUserId, state]);
+  }, [authStep, otp, pendingPricingPlanId, selectedUserId, state]);
 
   const start = useCallback(() => {
     if (!currentUser || !currentDevice || !selectedCourse || !selectedLesson) return;
@@ -335,6 +369,7 @@ export default function PrototypeApp() {
       lockVersion: lock.lock_version,
       videoToken: started.result.video_token,
       tokenExpiresAtMs: started.result.video_token_expires_at_ms,
+      watermark: started.result.watermark,
     });
     setHeartbeatsEnabled(true);
     setHeartbeatIn(HEARTBEAT_INTERVAL_SECONDS);
@@ -431,6 +466,7 @@ export default function PrototypeApp() {
       lockVersion: lock.lock_version,
       videoToken: switched.result.video_token,
       tokenExpiresAtMs: switched.result.video_token_expires_at_ms,
+      watermark: switched.result.watermark,
     });
     setConflict(null);
     setHeartbeatsEnabled(true);
@@ -465,10 +501,13 @@ export default function PrototypeApp() {
     setNotice(`Free preview opened for “${lesson.title}”. Secure playback rules still apply.`);
   }, []);
 
-  const openCheckout = useCallback((courseId: string) => {
+  const openCheckout = useCallback((courseId: string, planId: PricingPlanId = 'bronze') => {
     setCheckoutCourseId(courseId);
+    setSelectedPricingPlanId(planId);
+    setSelectedPricingPathIndex(0);
+    setPendingPricingPlanId(null);
     setPage('Checkout');
-    setNotice('Choose an unlock method. This demo simulates the Edge Function response.');
+    setNotice('Choose a plan, confirm its fixed subject path, then select an unlock method.');
   }, []);
 
   const completeUnlock = useCallback(() => {
@@ -476,15 +515,20 @@ export default function PrototypeApp() {
       setNotice('Coupon rejected by the demo validation function. Try WELCOME12.');
       return;
     }
-    setEnrolledCourseIds((current) => current.includes(checkoutCourseId) ? current : [...current, checkoutCourseId]);
-    const course = studentCourses.find((item) => item.id === checkoutCourseId);
+    const unlockedCourses = studentCourses.filter((course) =>
+      selectedPlanSubjects.includes(course.category as AcademicSubject),
+    );
+    const unlockedCourseIds = unlockedCourses.map((course) => course.id);
+    setEnrolledCourseIds((current) => Array.from(new Set([...current, ...unlockedCourseIds])));
+    const course = unlockedCourses[0] ?? checkoutCourse;
     setNotice(
       unlockMethod === 'Manual payment'
-        ? `Payment proof uploaded for ${course?.title}. Demo admin approval completed and access is active.`
-        : `${course?.title} unlocked. Enrollment and notification rows were created.`,
+        ? `Payment proof uploaded for ${selectedPricingPlan.tierName}. Demo admin approval completed and access is active.`
+        : `${selectedPricingPlan.tierName} activated for ${pathLabel(selectedPlanSubjects)}. Enrollment and notification rows were created.`,
     );
+    setPendingPricingPlanId(null);
     if (course) openCourse(course);
-  }, [checkoutCourseId, couponCode, openCourse, unlockMethod]);
+  }, [checkoutCourse, couponCode, openCourse, selectedPlanSubjects, selectedPricingPlan, unlockMethod]);
 
   const submitSupportTicket = useCallback(() => {
     if (!supportMessage.trim()) {
@@ -576,10 +620,14 @@ export default function PrototypeApp() {
     setSelectedLessonId('lesson_008');
     setCompletedLessonIds(initialCompletedLessonIds);
     setExpandedChapterIds(['chapter_003']);
+    setSelectedPricingPlanId('bronze');
+    setSelectedPricingPathIndex(0);
+    setPendingPricingPlanId(null);
     setHeartbeatsEnabled(true);
     setHeartbeatIn(HEARTBEAT_INTERVAL_SECONDS);
     setNotice('Register a device to begin the demo.');
     setAuthStep('account');
+    setShowLanding(true);
   }, [player]);
 
   const switchUser = useCallback(() => {
@@ -594,14 +642,32 @@ export default function PrototypeApp() {
     setHeartbeatIn(HEARTBEAT_INTERVAL_SECONDS);
     setPage('Courses');
     setAuthStep('account');
+    setPendingPricingPlanId(null);
+    setShowLanding(false);
     setNotice('Choose another role. Existing demo sessions and audit records are preserved.');
   }, [player]);
 
   if (!currentUser || !currentDevice) {
+    if (showLanding) {
+      return <LandingPage onStartDemo={(planId) => {
+        if (planId) {
+          setSelectedPricingPlanId(planId);
+          setSelectedPricingPathIndex(0);
+          setPendingPricingPlanId(planId);
+        } else {
+          setPendingPricingPlanId(null);
+        }
+        setShowLanding(false);
+      }} />;
+    }
+
     return (
       <SafeAreaView style={styles.screen}>
         <StatusBar style="dark" />
         <View style={styles.loginShell}>
+          <Pressable onPress={() => setShowLanding(true)} style={styles.backToLanding}>
+            <Text style={styles.backToLandingText}>Back to website</Text>
+          </Pressable>
           <View style={styles.loginBrand}>
             <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandImage} /></View>
             <Text style={styles.brandName}>E-Lern</Text>
@@ -612,7 +678,7 @@ export default function PrototypeApp() {
             <Text style={styles.loginSubtitle}>Choose a role, verify the demo OTP, and explore the complete learning platform.</Text>
             <Text style={styles.fieldLabel}>Mock user</Text>
             <View style={styles.userOptions}>
-              {state.users.map((user) => {
+              {availableUsers.map((user) => {
                 const selected = selectedUserId === user.id;
                 return (
                   <Pressable
@@ -659,16 +725,19 @@ export default function PrototypeApp() {
   }
 
   const userInitials = currentUser.name.split(' ').map((part) => part[0]).join('').slice(0, 2);
+  const desktopWeb = Platform.OS === 'web' && width >= 920;
   const roleNavigation: Page[] = currentUser.role === 'student'
-    ? ['Discover', 'Courses', 'Notifications']
+    ? (desktopWeb ? ['Discover', 'Courses', 'Plans', 'Notifications', 'Status', 'Profile'] : isIOS ? ['Discover', 'Courses', 'Plans', 'Notifications', 'Profile'] : ['Discover', 'Courses', 'Plans', 'Notifications'])
     : currentUser.role === 'teacher'
-      ? ['Teacher']
-      : ['Admin', 'Status'];
+      ? (desktopWeb || isIOS ? ['Teacher', 'Profile'] : ['Teacher'])
+      : (desktopWeb || isIOS ? ['Admin', 'Status', 'Profile'] : ['Admin', 'Status']);
   const isNavigationActive = (item: Page) => item === 'Courses'
-    ? ['Courses', 'Course', 'Checkout', 'Lesson'].includes(page)
-    : page === item;
+    ? ['Courses', 'Course', 'Lesson'].includes(page)
+    : item === 'Plans'
+      ? ['Plans', 'Checkout'].includes(page)
+      : page === item;
   const navigation = (
-    <View style={styles.bottomNavItems}>
+    <View style={[styles.bottomNavItems, isIOS && styles.bottomNavItemsIOS]}>
       {roleNavigation.map((item) => {
         const active = isNavigationActive(item);
         return (
@@ -678,38 +747,99 @@ export default function PrototypeApp() {
             accessibilityState={{ selected: active }}
             key={item}
             onPress={() => setPage(item)}
-            style={({ pressed }) => [styles.bottomNavItem, pressed && styles.bottomNavPressed]}
+            style={({ pressed }) => [
+              styles.bottomNavItem,
+              isIOS && styles.bottomNavItemIOS,
+              pressed && styles.bottomNavPressed,
+            ]}
           >
-            <View style={[styles.bottomNavIcon, active && styles.bottomNavIconActive]}>
+            <View style={[
+              styles.bottomNavIcon,
+              isIOS && styles.bottomNavIconIOS,
+              active && styles.bottomNavIconActive,
+              isIOS && active && styles.bottomNavIconActiveIOS,
+            ]}>
               {navigationIcon(item, active)}
             </View>
-            <Text numberOfLines={1} style={[styles.bottomNavLabel, active && styles.bottomNavLabelActive]}>{item}</Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.bottomNavLabel,
+                isIOS && styles.bottomNavLabelIOS,
+                active && styles.bottomNavLabelActive,
+              ]}
+            >
+              {item}
+            </Text>
           </Pressable>
         );
       })}
     </View>
   );
+  const profileTrigger = (
+    <Pressable accessibilityLabel="Open profile" accessibilityRole="button" onPress={() => setPage('Profile')} style={({ pressed }) => [styles.profileTrigger, desktopWeb && styles.webProfileTrigger, pressed && styles.pressed]}>
+      <View style={styles.avatar}><Text style={styles.avatarText}>{userInitials}</Text></View>
+      <View style={styles.profileTriggerCopy}>
+        <Text numberOfLines={1} style={styles.profileTriggerName}>{currentUser.name}</Text>
+        {!compact && <Text style={styles.profileTriggerHint}>{desktopWeb ? currentUser.email : 'View profile'}</Text>}
+      </View>
+    </Pressable>
+  );
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, desktopWeb && styles.webScreen]}>
       <StatusBar style="dark" />
-      <View style={styles.topbar}>
-        <Pressable accessibilityLabel="Open profile" accessibilityRole="button" onPress={() => setPage('Profile')} style={({ pressed }) => [styles.profileTrigger, pressed && styles.pressed]}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{userInitials}</Text></View>
-          <View style={styles.profileTriggerCopy}>
-            <Text numberOfLines={1} style={styles.profileTriggerName}>{currentUser.name}</Text>
-            {!compact && <Text style={styles.profileTriggerHint}>View profile</Text>}
+      <View style={[styles.topbar, desktopWeb && styles.webTopbar]}>
+        {desktopWeb ? (
+          <View style={styles.webBrand}>
+            <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandImage} /></View>
+            <View>
+              <Text style={styles.brandName}>E-Lern</Text>
+              <Text style={styles.brandTagline}>{currentUser.role === 'admin' ? 'Administration workspace' : 'Grade 12 learning workspace'}</Text>
+            </View>
           </View>
-        </Pressable>
+        ) : profileTrigger}
         <View style={styles.topbarRight}>
           <Pill label={compact ? currentUser.role : `${currentUser.role[0]?.toUpperCase()}${currentUser.role.slice(1)} account`} tone={currentUser.role === 'student' ? 'success' : 'warning'} />
           {!compact && currentUser.role === 'admin' && <Pill label={state.redis_available ? 'Redis online' : 'Redis unavailable'} tone={state.redis_available ? 'success' : 'danger'} />}
-          {!compact && <Text style={styles.deviceLabel}>{currentDevice.device_name}</Text>}
+          {!compact && !desktopWeb && <Text style={styles.deviceLabel}>{currentDevice.device_name}</Text>}
+          {desktopWeb && profileTrigger}
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
+      <View style={[styles.appBody, desktopWeb && styles.webAppBody]}>
+        {desktopWeb && (
+          <View style={styles.webSidebar}>
+            <Text style={styles.webSidebarEyebrow}>WORKSPACE</Text>
+            <View style={styles.webSidebarNavigation}>
+              {roleNavigation.map((item) => {
+                const active = isNavigationActive(item);
+                return (
+                  <Pressable
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                    key={item}
+                    onPress={() => setPage(item)}
+                    style={({ pressed }) => [styles.webNavItem, active && styles.webNavItemActive, pressed && styles.pressed]}
+                  >
+                    <View style={[styles.webNavIcon, active && styles.webNavIconActive]}>{navigationIcon(item, active)}</View>
+                    <Text style={[styles.webNavLabel, active && styles.webNavLabelActive]}>{item}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.webSidebarFooter}>
+              <ShieldCheck color={colors.green} size={19} />
+              <View style={styles.webSidebarFooterCopy}>
+                <Text style={styles.webSidebarFooterTitle}>Protected learning</Text>
+                <Text style={styles.webSidebarFooterText}>One active playback device</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <ScrollView style={[styles.scroll, desktopWeb && styles.webMainScroll]} contentContainerStyle={[styles.scrollContent, desktopWeb && styles.webScrollContent]}>
+          <View style={[styles.content, desktopWeb && styles.webContent]}>
           {notice ? (
             <View style={styles.noticeBar}>
               <Activity color={colors.blue} size={17} />
@@ -755,7 +885,7 @@ export default function PrototypeApp() {
                   {teachers.filter((teacher) => teacher.subjectId === selectedSubjectId).map((teacher) => (
                     <Pressable key={teacher.id} onPress={() => setSelectedTeacherId(teacher.id)} style={[styles.teacherCard, selectedTeacherId === teacher.id && styles.teacherCardSelected]}>
                       <View style={styles.teacherAvatar}><Text style={styles.avatarText}>{teacher.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
-                      <View style={styles.teacherCopy}><Text style={styles.courseCardTitle}>{teacher.name}</Text><Text style={styles.courseCardInstructor}>{teacher.subject}</Text><Text style={styles.courseCardDescription}>{teacher.bio}</Text><Text style={styles.courseStat}>{teacher.students} students · {teacher.completionRate}% completion</Text></View>
+                      <View style={styles.teacherCopy}><Text style={styles.courseCardTitle}>{teacher.name}</Text><Text style={styles.teacherSubject}>{teacher.subject}</Text><Text style={styles.courseCardDescription}>{teacher.bio}</Text><Text style={styles.courseStat}>{teacher.students} students · {teacher.completionRate}% completion</Text></View>
                       {selectedTeacherId === teacher.id && <Check color={colors.green} size={20} />}
                     </Pressable>
                   ))}
@@ -768,7 +898,7 @@ export default function PrototypeApp() {
                     const enrolled = enrolledCourseIds.includes(courseItem.id);
                     return (
                       <View key={courseItem.id} style={styles.courseCard}>
-                        <View style={styles.courseCardTop}><View style={styles.courseCategoryIcon}><CourseCategoryIcon category={courseItem.category} /></View><Pill label={enrolled ? 'Enrolled' : '45,000 IQD'} tone={enrolled ? 'success' : 'warning'} /></View>
+                        <View style={styles.courseCardTop}><View style={styles.courseCategoryIcon}><CourseCategoryIcon category={courseItem.category} /></View><Pill label={enrolled ? 'Enrolled' : `Bronze · ${formatIQD(pricingPlanById('bronze').retailPriceIQD)}`} tone={enrolled ? 'success' : 'warning'} /></View>
                         <Text style={styles.courseCardTitle}>{courseItem.title}</Text><Text style={styles.courseCardInstructor}>{courseItem.instructor}</Text><Text style={styles.courseCardDescription}>{courseItem.description}</Text>
                         <View style={styles.actionRow}><Button label="Free preview" tone="secondary" onPress={() => previewCourse(courseItem)} /><Button label={enrolled ? 'Open course' : 'Unlock course'} onPress={() => enrolled ? openCourse(courseItem) : openCheckout(courseItem.id)} /></View>
                       </View>
@@ -779,10 +909,90 @@ export default function PrototypeApp() {
             </View>
           )}
 
+          {page === 'Plans' && currentUser.role === 'student' && (
+            <View style={styles.pageStack}>
+              <View style={styles.pageHeader}>
+                <View>
+                  <Text style={styles.overline}>ACADEMIC-YEAR ACCESS</Text>
+                  <Text style={styles.pageTitle}>Choose your plan</Text>
+                  <Text style={styles.pageSubtitle}>{ACADEMIC_YEAR_ACCESS_MODEL}</Text>
+                </View>
+                <Pill label="One-time purchase" tone="success" />
+              </View>
+              <View style={[styles.planGrid, compact && styles.planGridCompact]}>
+                {pricingPlans.map((plan) => (
+                  <View key={plan.id} style={[styles.planCard, plan.id === 'platinum' && styles.planCardVip]}>
+                    <View style={styles.courseCardTop}>
+                      <Text style={[styles.planName, plan.id === 'platinum' && styles.planTextVip]}>{plan.tierName}</Text>
+                      <Pill label="Full year" tone={plan.id === 'platinum' ? 'warning' : 'success'} />
+                    </View>
+                    <Text style={[styles.planPrice, plan.id === 'platinum' && styles.planTextVip]}>{formatIQD(plan.retailPriceIQD)}</Text>
+                    <Text style={[styles.planUnlocks, plan.id === 'platinum' && styles.planTextVipMuted]}>{plan.unlocks}</Text>
+                    <View style={styles.planPaths}>
+                      {plan.allowedPaths.length > 0 ? plan.allowedPaths.map((path) => (
+                        <View key={pathLabel(path)} style={[styles.planPathChip, plan.id === 'platinum' && styles.planPathChipVip]}>
+                          <Text style={[styles.planPathText, plan.id === 'platinum' && styles.planTextVip]}>{pathLabel(path)}</Text>
+                        </View>
+                      )) : (
+                        <View style={styles.planPathChip}><Text style={styles.planPathText}>Choose any one subject</Text></View>
+                      )}
+                    </View>
+                    <Button
+                      label={`Choose ${plan.shortName}`}
+                      tone={plan.id === 'platinum' ? 'warning' : 'primary'}
+                      onPress={() => openCheckout(selectedCourseId, plan.id)}
+                    />
+                  </View>
+                ))}
+              </View>
+              <View style={styles.planRuleBanner}>
+                <LockKeyhole color={colors.blue} size={18} />
+                <Text style={styles.noticeText}>Bundle subjects are fixed. Custom multi-teacher mixes are disabled, and access remains valid through the August/September resits.</Text>
+              </View>
+            </View>
+          )}
+
           {page === 'Checkout' && currentUser.role === 'student' && (
             <View style={styles.pageStack}>
-              <View style={styles.breadcrumbRow}><Pressable onPress={() => setPage('Discover')}><Text style={styles.breadcrumbLink}>Discover</Text></Pressable><ChevronRight color={colors.subtle} size={14} /><Text style={styles.breadcrumbCurrent}>Unlock course</Text></View>
-              <View style={styles.pageHeader}><View><Text style={styles.overline}>SECURE COURSE ACCESS</Text><Text style={styles.pageTitle}>Unlock {studentCourses.find((course) => course.id === checkoutCourseId)?.title}</Text><Text style={styles.pageSubtitle}>Choose coupon, manual proof, or a simulated online gateway.</Text></View><Pill label="45,000 IQD" tone="warning" /></View>
+              <View style={styles.breadcrumbRow}><Pressable onPress={() => setPage('Plans')}><Text style={styles.breadcrumbLink}>Plans</Text></Pressable><ChevronRight color={colors.subtle} size={14} /><Text style={styles.breadcrumbCurrent}>Activate academic-year access</Text></View>
+              <View style={styles.pageHeader}><View><Text style={styles.overline}>SECURE ACADEMIC-YEAR ACCESS</Text><Text style={styles.pageTitle}>Choose and activate your plan</Text><Text style={styles.pageSubtitle}>One payment covers access through the August/September ministerial resits.</Text></View><Pill label={formatIQD(selectedPricingPlan.retailPriceIQD)} tone="warning" /></View>
+              <View style={styles.planChoiceGrid}>
+                {pricingPlans.map((plan) => {
+                  const selected = selectedPricingPlanId === plan.id;
+                  return (
+                    <Pressable
+                      accessibilityState={{ selected }}
+                      key={plan.id}
+                      onPress={() => { setSelectedPricingPlanId(plan.id); setSelectedPricingPathIndex(0); }}
+                      style={[styles.planChoice, selected && styles.planChoiceSelected]}
+                    >
+                      <Text style={[styles.planChoiceName, selected && styles.planChoiceNameSelected]}>{plan.shortName}</Text>
+                      <Text style={[styles.planChoicePrice, selected && styles.planChoiceNameSelected]}>{formatIQD(plan.retailPriceIQD)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {selectedPricingPlan.allowedPaths.length > 1 && (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.fieldLabel}>Choose exactly one Silver path</Text>
+                  <View style={styles.pathChoiceGrid}>
+                    {selectedPricingPlan.allowedPaths.map((path, index) => {
+                      const selected = selectedPricingPathIndex === index;
+                      return (
+                        <Pressable
+                          accessibilityState={{ selected }}
+                          key={pathLabel(path)}
+                          onPress={() => setSelectedPricingPathIndex(index)}
+                          style={[styles.pathChoice, selected && styles.pathChoiceSelected]}
+                        >
+                          <Check color={selected ? colors.white : colors.green} size={17} />
+                          <Text style={[styles.pathChoiceText, selected && styles.pathChoiceTextSelected]}>{pathLabel(path)}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
               <View style={[styles.checkoutLayout, compact && styles.courseLayoutCompact]}>
                 <View style={styles.sectionBlock}>
                   <Text style={styles.fieldLabel}>Unlock method</Text>
@@ -792,7 +1002,7 @@ export default function PrototypeApp() {
                   {unlockMethod === 'Online payment' && <View style={styles.uploadBox}><CreditCard color={colors.blue} size={24} /><Text style={styles.registrationTitle}>ZainCash / FastPay gateway</Text><Text style={styles.registrationMeta}>The demo returns a successful verified transaction.</Text></View>}
                   <Button label={unlockMethod === 'Manual payment' ? 'Upload and submit' : unlockMethod === 'Coupon' ? 'Apply code and unlock' : 'Pay securely'} icon={<KeyRound color={colors.white} size={16} />} onPress={completeUnlock} />
                 </View>
-                <View style={styles.sessionPanel}><Text style={styles.panelEyebrow}>WHAT HAPPENS NEXT</Text><View style={styles.detailList}><Detail label="Validation" value="Edge Function" /><Detail label="Enrollment" value="RLS-protected row" /><Detail label="Receipt" value="Push + email" /><Detail label="Course access" value="Immediate after approval" /></View></View>
+                <View style={styles.sessionPanel}><Text style={styles.panelEyebrow}>ORDER SUMMARY</Text><Text style={styles.panelTitle}>{selectedPricingPlan.tierName}</Text><Text style={styles.pageSubtitle}>{selectedPricingPlan.unlocks}</Text><View style={styles.detailList}><Detail label="Subjects" value={pathLabel(selectedPlanSubjects)} /><Detail label="Price" value={formatIQD(selectedPricingPlan.retailPriceIQD)} /><Detail label="Access" value="Through Aug/Sep resits" /><Detail label="Enrollment" value="Immediate after approval" /></View></View>
               </View>
             </View>
           )}
@@ -964,7 +1174,7 @@ export default function PrototypeApp() {
                       style={styles.video}
                       nativeControls={ownsActiveLock}
                       contentFit="contain"
-                      fullscreenOptions={{ enable: true }}
+                      allowsFullscreen={false}
                     />
                     {!ownsActiveLock && (
                       <View style={styles.videoGate}>
@@ -974,8 +1184,8 @@ export default function PrototypeApp() {
                         <Button label="Start lesson" icon={<Play color={colors.white} fill={colors.white} size={16} />} onPress={start} />
                       </View>
                     )}
-                    {ownsActiveLock && (
-                      <View style={styles.watermark}><Text style={styles.watermarkText}>{currentUser.name}</Text></View>
+                    {ownsActiveLock && clientSession && (
+                      <DynamicWatermark watermark={clientSession.watermark} />
                     )}
                   </View>
                   <View style={styles.playerControls}>
@@ -1141,11 +1351,30 @@ export default function PrototypeApp() {
                   <Button label="Reset all demo data" tone="danger" onPress={resetDemo} />
                 </View>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.segmented}>{(['Overview', 'Content', 'Payments', 'Coupons', 'Sessions', 'Risk events', 'Devices', 'Notifications', 'Audit logs'] as AdminView[]).map((item) => <Pressable key={item} style={[styles.segment, adminView === item && styles.segmentActive]} onPress={() => setAdminView(item)}><Text style={[styles.segmentText, adminView === item && styles.segmentTextActive]}>{item}</Text></Pressable>)}</View></ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.segmented}>{(['Overview', 'Content', 'Plans', 'Payments', 'Coupons', 'Sessions', 'Risk events', 'Devices', 'Notifications', 'Audit logs'] as AdminView[]).map((item) => <Pressable key={item} style={[styles.segment, adminView === item && styles.segmentActive]} onPress={() => setAdminView(item)}><Text style={[styles.segmentText, adminView === item && styles.segmentTextActive]}>{item}</Text></Pressable>)}</View></ScrollView>
 
               {adminView === 'Overview' && <><View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<Users color={colors.green} size={20} />} label="Students" value="2,416" note="128 active today" /><Metric icon={<CreditCard color={colors.blue} size={20} />} label="Pending payments" value={String(payments.filter((item) => item.status === 'Pending').length)} note="Needs review" /><Metric icon={<PlayCircle color={colors.amber} size={20} />} label="Active streams" value={String(Object.keys(state.locks).length)} note="Protected sessions" /><Metric icon={<ShieldAlert color={colors.red} size={20} />} label="Risk events" value={String(state.playback_risk_events.length)} note="Review suspicious activity" /></View><View style={[styles.courseGrid, compact && styles.courseGridCompact]}><Pressable style={styles.quickAction} onPress={() => setAdminView('Content')}><Plus color={colors.green} size={22} /><Text style={styles.studentDeviceName}>Publish content</Text><Text style={styles.courseCardDescription}>Manage subjects, teachers, courses, chapters, lessons, and secure video IDs.</Text></Pressable><Pressable style={styles.quickAction} onPress={() => setAdminView('Payments')}><CreditCard color={colors.blue} size={22} /><Text style={styles.studentDeviceName}>Review payments</Text><Text style={styles.courseCardDescription}>Approve manual proofs, refund transactions, and activate enrollment.</Text></Pressable><Pressable style={styles.quickAction} onPress={() => setAdminView('Notifications')}><Bell color={colors.amber} size={22} /><Text style={styles.studentDeviceName}>Send broadcast</Text><Text style={styles.courseCardDescription}>Queue push and email announcements for students.</Text></Pressable></View></>}
 
               {adminView === 'Content' && <View style={styles.pageStack}><View style={styles.actionRow}><Button label="Add subject" tone="secondary" icon={<Plus color={colors.greenDark} size={16} />} onPress={() => setNotice('New subject draft created.')} /><Button label="Add course" icon={<Plus color={colors.white} size={16} />} onPress={() => setNotice('New course draft created. Add chapters and lessons before publishing.')} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['Subject', 'Teacher', 'Course', 'Lessons', 'Status']} />{contentRows.map((row) => <TableRow key={row.course} cells={[row.subject, row.teacher, row.course, row.lessons, row.status]} />)}</View></ScrollView><View style={styles.adminFooter}><Upload color={colors.blue} size={18} /><Text style={styles.adminFooterText}>Lesson publishing accepts a DRM provider video ID plus PDFs and thumbnails from private Storage buckets.</Text></View></View>}
+
+              {adminView === 'Plans' && <View style={styles.pageStack}>
+                <View style={styles.pageHeader}>
+                  <View><Text style={styles.panelTitle}>Academic-year pricing and payouts</Text><Text style={styles.pageSubtitle}>Retail totals and payout allocations use the same shared rules as student checkout.</Text></View>
+                  <Pill label="Fixed bundles" tone="success" />
+                </View>
+                <View style={[styles.planGrid, compact && styles.planGridCompact]}>
+                  {pricingPlans.map((plan) => (
+                    <View key={plan.id} style={styles.adminPlanCard}>
+                      <View style={styles.courseCardTop}><Text style={styles.planName}>{plan.tierName}</Text><Text style={styles.planChoicePrice}>{formatIQD(plan.retailPriceIQD)}</Text></View>
+                      <Text style={styles.planUnlocks}>{plan.unlocks}</Text>
+                      <View style={styles.detailList}>
+                        {Object.entries(plan.payoutStructure).map(([key, amount]) => <Detail key={key} label={payoutLabel(key)} value={formatIQD(amount)} />)}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.planRuleBanner}><ShieldCheck color={colors.green} size={18} /><Text style={styles.noticeText}>Custom multi-teacher mix: {pricingSystemConstraints.allowCustomMultiTeacherMix ? 'Allowed' : 'Disabled'} · Minimum bundle teacher payout: {formatIQD(pricingSystemConstraints.minimumBundleTeacherPayoutIQD)}</Text></View>
+              </View>}
 
               {adminView === 'Payments' && <View style={styles.listPanel}>{payments.map((payment) => <View key={payment.id} style={styles.paymentRow}><View style={styles.paymentIcon}><CreditCard color={colors.blue} size={20} /></View><View style={styles.notificationCopy}><View style={styles.userNameLine}><Text style={styles.studentDeviceName}>{payment.student}</Text><Pill label={payment.status} tone={payment.status === 'Pending' ? 'warning' : payment.status === 'Approved' ? 'success' : 'neutral'} /></View><Text style={styles.courseCardDescription}>{payment.course} · {payment.amount} · {payment.method}</Text><Text style={styles.studentDeviceMeta}>{payment.id}</Text></View><View style={styles.actionRow}>{payment.status === 'Pending' && <Button label="Approve" onPress={() => updatePayment(payment.id, 'Approved')} />}<Button label="Refund" tone="secondary" onPress={() => updatePayment(payment.id, 'Refunded')} /></View></View>)}</View>}
 
@@ -1178,19 +1407,16 @@ export default function PrototypeApp() {
               <View style={styles.adminFooter}><Database color={colors.blue} size={18} /><Text style={styles.adminFooterText}>This demo mirrors the architecture’s RLS-protected tables and Edge Function actions without contacting production services.</Text></View>
             </View>
           )}
-        </View>
-      </ScrollView>
-      <View style={styles.bottomNavDock}>
-        {isIOS && isGlassEffectAPIAvailable() ? (
-          <GlassView glassEffectStyle="regular" isInteractive style={styles.bottomNavGlass}>
-            {navigation}
-          </GlassView>
-        ) : (
+          </View>
+        </ScrollView>
+      </View>
+      {!desktopWeb && (
+        <View style={[styles.bottomNavDock, isIOS && styles.bottomNavDockIOS]}>
           <View style={[styles.bottomNavSurface, Platform.OS === 'android' && styles.bottomNavAndroid, isIOS && styles.bottomNavIOSFallback]}>
             {navigation}
           </View>
-        )}
-      </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1209,6 +1435,7 @@ function navigationIcon(page: Page, active: boolean) {
   const color = active ? colors.greenDark : colors.muted;
   if (page === 'Discover') return <BookOpen color={color} size={20} />;
   if (page === 'Courses') return <GraduationCap color={color} size={20} />;
+  if (page === 'Plans') return <TicketCheck color={color} size={20} />;
   if (page === 'Notifications') return <Bell color={color} size={20} />;
   if (page === 'Teacher') return <BarChart3 color={color} size={20} />;
   if (page === 'Admin') return <ShieldCheck color={color} size={20} />;
@@ -1234,6 +1461,11 @@ function formatTime(value: string) {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: colors.canvas, flex: 1 },
+  webScreen: { backgroundColor: '#eef2f0' },
+  appBody: { flex: 1 },
+  webAppBody: { alignItems: 'stretch', flexDirection: 'row' },
+  backToLanding: { alignSelf: 'center', marginBottom: 16, paddingHorizontal: 12, paddingVertical: 8 },
+  backToLandingText: { color: colors.greenDark, fontSize: 12, fontWeight: '800' },
   loginShell: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: isIOS ? 20 : 24 },
   loginBrand: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 18 },
   loginPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 20 : 8, borderWidth: isIOS ? 0 : 1, maxWidth: 520, padding: isIOS ? 20 : 26, width: '100%', ...(isIOS ? { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24 } : {}) },
@@ -1259,7 +1491,10 @@ const styles = StyleSheet.create({
   helperText: { color: colors.muted, fontSize: 10, marginBottom: 14, marginTop: 6 },
   loginFootnote: { color: colors.muted, fontSize: 11, marginTop: 16, textAlign: 'center' },
   topbar: { alignItems: 'center', backgroundColor: isIOS ? 'rgba(249,249,249,0.94)' : colors.white, borderBottomColor: colors.border, borderBottomWidth: isIOS ? StyleSheet.hairlineWidth : 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: isIOS ? 52 : 68, paddingHorizontal: isIOS ? 16 : 24 },
+  webTopbar: { minHeight: 76, paddingHorizontal: 28 },
+  webBrand: { alignItems: 'center', flexDirection: 'row', gap: 11 },
   profileTrigger: { alignItems: 'center', borderRadius: 22, flexDirection: 'row', gap: 10, maxWidth: '55%', paddingHorizontal: 4, paddingVertical: 4 },
+  webProfileTrigger: { backgroundColor: '#f7f9f8', borderColor: colors.border, borderRadius: 12, borderWidth: 1, maxWidth: 290, paddingHorizontal: 10, paddingVertical: 7 },
   profileTriggerCopy: { flexShrink: 1, minWidth: 0 },
   profileTriggerName: { color: colors.ink, fontSize: isIOS ? 17 : 14, fontWeight: isIOS ? '600' : '800' },
   profileTriggerHint: { color: colors.muted, fontSize: 10, marginTop: 2 },
@@ -1272,21 +1507,42 @@ const styles = StyleSheet.create({
   deviceLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   avatar: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 19, height: isIOS ? 36 : 38, justifyContent: 'center', width: isIOS ? 36 : 38 },
   avatarText: { color: colors.white, fontSize: 12, fontWeight: '800' },
-  bottomNavDock: { alignItems: 'center', paddingHorizontal: 12, paddingVertical: isIOS ? 7 : 0 },
-  bottomNavGlass: { borderRadius: 28, maxWidth: 720, overflow: 'hidden', width: '100%' },
+  bottomNavDock: { alignItems: 'center', paddingHorizontal: 12, paddingVertical: 0 },
+  bottomNavDockIOS: { paddingBottom: 4, paddingHorizontal: 12, paddingTop: 8 },
   bottomNavSurface: { backgroundColor: 'rgba(255,255,255,0.96)', borderColor: colors.border, borderRadius: Platform.OS === 'web' ? 24 : 0, borderTopWidth: 1, maxWidth: Platform.OS === 'web' ? 720 : undefined, overflow: 'hidden', width: '100%' },
   bottomNavAndroid: { backgroundColor: '#f7faf8', borderRadius: 0, elevation: 8 },
-  bottomNavIOSFallback: { backgroundColor: 'rgba(249,249,249,0.96)', borderRadius: 28, borderWidth: StyleSheet.hairlineWidth, maxWidth: 720 },
-  bottomNavItems: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-around', minHeight: isIOS ? 60 : 64, paddingHorizontal: 5, paddingVertical: 5 },
+  bottomNavIOSFallback: { backgroundColor: 'rgba(255,255,255,0.98)', borderColor: '#d9d9de', borderRadius: 20, borderTopWidth: 0, borderWidth: StyleSheet.hairlineWidth, maxWidth: 720, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.11, shadowRadius: 18 },
+  bottomNavItems: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-around', minHeight: 64, paddingHorizontal: 5, paddingVertical: 5 },
+  bottomNavItemsIOS: { minHeight: 66, paddingHorizontal: 6, paddingVertical: 6 },
   bottomNavItem: { alignItems: 'center', flex: 1, gap: 2, justifyContent: 'center', minHeight: 54, minWidth: 54, paddingHorizontal: 3 },
+  bottomNavItemIOS: { gap: 3, minHeight: 54, minWidth: 60, paddingHorizontal: 2 },
   bottomNavPressed: { transform: [{ scale: 0.97 }] },
   bottomNavIcon: { alignItems: 'center', borderRadius: 18, height: 32, justifyContent: 'center', width: 52 },
-  bottomNavIconActive: { backgroundColor: isIOS ? 'transparent' : colors.greenSoft },
+  bottomNavIconIOS: { borderRadius: 13, height: 30, width: 46 },
+  bottomNavIconActive: { backgroundColor: colors.greenSoft },
+  bottomNavIconActiveIOS: { backgroundColor: '#e8f2ff' },
   bottomNavLabel: { color: colors.muted, fontSize: isIOS ? 10 : 9, fontWeight: isIOS ? '500' : '700' },
+  bottomNavLabelIOS: { fontSize: 10, letterSpacing: -0.05 },
   bottomNavLabelActive: { color: colors.greenDark, fontWeight: isIOS ? '600' : '800' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
+  webMainScroll: { backgroundColor: '#eef2f0' },
+  webScrollContent: { paddingBottom: 40 },
+  webSidebar: { backgroundColor: '#15231e', borderRightColor: '#273b34', borderRightWidth: 1, paddingHorizontal: 16, paddingVertical: 24, width: 248 },
+  webSidebarEyebrow: { color: '#82978f', fontSize: 9, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 12 },
+  webSidebarNavigation: { gap: 5, marginTop: 14 },
+  webNavItem: { alignItems: 'center', borderRadius: 9, flexDirection: 'row', gap: 12, minHeight: 48, paddingHorizontal: 10 },
+  webNavItemActive: { backgroundColor: '#244338' },
+  webNavIcon: { alignItems: 'center', borderRadius: 7, height: 32, justifyContent: 'center', width: 34 },
+  webNavIconActive: { backgroundColor: '#dff2e8' },
+  webNavLabel: { color: '#b8c6c1', fontSize: 13, fontWeight: '700' },
+  webNavLabelActive: { color: colors.white },
+  webSidebarFooter: { alignItems: 'center', backgroundColor: '#1c3029', borderColor: '#2c493f', borderRadius: 10, borderWidth: 1, bottom: 22, flexDirection: 'row', gap: 10, left: 16, padding: 12, position: 'absolute', right: 16 },
+  webSidebarFooterCopy: { flex: 1 },
+  webSidebarFooterTitle: { color: colors.white, fontSize: 11, fontWeight: '800' },
+  webSidebarFooterText: { color: '#90a49d', fontSize: 9, lineHeight: 13, marginTop: 2 },
   content: { alignSelf: 'center', maxWidth: 1200, paddingHorizontal: isIOS ? 16 : 24, paddingTop: isIOS ? 14 : 20, width: '100%' },
+  webContent: { alignSelf: 'stretch', maxWidth: 1440, paddingHorizontal: 32, paddingTop: 30 },
   pageStack: { gap: isIOS ? 20 : 22 },
   sectionBlock: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, gap: 14, padding: isIOS ? 16 : 18 },
   choiceRow: { gap: 10, paddingTop: 12 },
@@ -1299,7 +1555,34 @@ const styles = StyleSheet.create({
   teacherCardSelected: { backgroundColor: colors.greenSoft, borderColor: '#9cc8b4' },
   teacherAvatar: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   teacherCopy: { flex: 1, minWidth: 0 },
+  teacherSubject: { color: colors.green, fontSize: 11, fontWeight: '700', lineHeight: 15, marginTop: 1 },
   checkoutLayout: { alignItems: 'flex-start', flexDirection: 'row', gap: 16 },
+  planGrid: { alignItems: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  planGridCompact: { flexDirection: 'column' },
+  planCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 16 : 9, borderWidth: isIOS ? 0 : 1, flex: 1, gap: 14, minWidth: 235, padding: isIOS ? 18 : 20 },
+  planCardVip: { backgroundColor: colors.charcoal, borderColor: colors.charcoal },
+  planName: { color: colors.ink, fontSize: 13, fontWeight: '900' },
+  planPrice: { color: colors.ink, fontSize: 24, fontWeight: '900' },
+  planUnlocks: { color: colors.muted, fontSize: 11, lineHeight: 17 },
+  planTextVip: { color: colors.white },
+  planTextVipMuted: { color: '#b8c3bf' },
+  planPaths: { gap: 7 },
+  planPathChip: { backgroundColor: colors.greenSoft, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 },
+  planPathChipVip: { backgroundColor: 'rgba(255,255,255,0.09)' },
+  planPathText: { color: colors.greenDark, fontSize: 10, fontWeight: '800', lineHeight: 15 },
+  planRuleBanner: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 12 : 7, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', gap: 10, padding: 14 },
+  planChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  planChoice: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 12 : 7, borderWidth: 1, flex: 1, gap: 5, minWidth: 145, padding: 14 },
+  planChoiceSelected: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  planChoiceName: { color: colors.ink, fontSize: 12, fontWeight: '900' },
+  planChoiceNameSelected: { color: colors.white },
+  planChoicePrice: { color: colors.greenDark, fontSize: 11, fontWeight: '800' },
+  pathChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  pathChoice: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 12 : 7, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 48, paddingHorizontal: 14 },
+  pathChoiceSelected: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  pathChoiceText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  pathChoiceTextSelected: { color: colors.white },
+  adminPlanCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, minWidth: 280, padding: isIOS ? 16 : 18 },
   uploadBox: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 14 : 7, borderStyle: 'dashed', borderWidth: isIOS ? 0 : 1, gap: 5, marginVertical: 14, padding: 24 },
   noticeBar: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 12 : 6, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', gap: 9, marginBottom: 20, minHeight: isIOS ? 44 : 42, paddingHorizontal: 12 },
   noticeText: { color: '#244f7d', flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 18 },
@@ -1368,8 +1651,6 @@ const styles = StyleSheet.create({
   videoGateIcon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
   videoGateTitle: { color: colors.white, fontSize: 20, fontWeight: '800', marginTop: 14 },
   videoGateText: { color: '#b8c3bf', fontSize: 12, lineHeight: 18, marginBottom: 16, marginTop: 5, maxWidth: 360, textAlign: 'center' },
-  watermark: { bottom: 10, left: 12, position: 'absolute' },
-  watermarkText: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700' },
   playerControls: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, padding: 13 },
   roundControl: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
   playerControlCopy: { flex: 1 },

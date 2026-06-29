@@ -22,6 +22,7 @@ export const subjects: Subject[] = [
   { id: 'biology', name: 'Biology', teacherCount: 2, courseCount: 3 },
   { id: 'kurdish', name: 'Kurdish', teacherCount: 2, courseCount: 2 },
   { id: 'english', name: 'English', teacherCount: 2, courseCount: 2 },
+  { id: 'arabic', name: 'Arabic', teacherCount: 2, courseCount: 2 },
 ];
 
 export const teachers: TeacherProfile[] = [
@@ -38,14 +39,14 @@ export const initialNotifications = [
 ];
 
 export const initialPayments = [
-  { id: 'PAY-1048', student: 'Darya Ahmed', course: 'Grade 12 Physics', amount: '45,000 IQD', method: 'FastPay proof', status: 'Pending' },
-  { id: 'PAY-1047', student: 'Ari Kamal', course: 'Grade 12 Mathematics', amount: '50,000 IQD', method: 'ZainCash', status: 'Approved' },
-  { id: 'PAY-1046', student: 'Narin Omer', course: 'Grade 12 Chemistry', amount: '42,000 IQD', method: 'Manual proof', status: 'Refunded' },
+  { id: 'PAY-1048', student: 'Darya Ahmed', course: 'Bronze Code · Physics', amount: '89,000 IQD', method: 'FastPay proof', status: 'Pending' },
+  { id: 'PAY-1047', student: 'Ari Kamal', course: 'Silver Code · Mathematics + Physics', amount: '159,000 IQD', method: 'ZainCash', status: 'Approved' },
+  { id: 'PAY-1046', student: 'Narin Omer', course: 'Gold Code · Core Science Trio', amount: '199,000 IQD', method: 'Manual proof', status: 'Refunded' },
 ];
 
 export const initialCoupons = [
-  { code: 'WELCOME12', course: 'All Grade 12 courses', uses: '28 / 100', expires: '30 Sep 2026', status: 'Active' },
-  { code: 'PHYSICS25', course: 'Grade 12 Physics', uses: '11 / 50', expires: '15 Aug 2026', status: 'Active' },
+  { code: 'WELCOME12', course: 'Any academic-year pricing plan', uses: '28 / 100', expires: '30 Sep 2026', status: 'Active' },
+  { code: 'PHYSICS25', course: 'Bronze Code · Physics', uses: '11 / 50', expires: '15 Aug 2026', status: 'Active' },
 ];
 
 export const teacherStudents = [

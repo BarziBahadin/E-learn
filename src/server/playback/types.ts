@@ -1,3 +1,5 @@
+import type { PlaybackWatermark } from '../../features/playback/watermark';
+
 export type PlaybackLockAction = 'acquired' | 'refreshed';
 
 export type PlaybackLockMetadata = {
@@ -36,6 +38,7 @@ export type PlaybackLockSuccess = {
   lockVersion: number;
   playbackToken: string;
   expiresAt: string;
+  watermark?: PlaybackWatermark;
 };
 
 export type PlaybackLockConflict = {
@@ -83,6 +86,7 @@ export type ForceSwitchResult =
       oldSessionId: string;
       oldDeviceId: string;
       expiresAt: string;
+      watermark?: PlaybackWatermark;
     }
   | {
       status: 'error';
