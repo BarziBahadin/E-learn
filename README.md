@@ -11,6 +11,21 @@ pnpm web
 
 Open `http://localhost:8081`. For native development, run `pnpm ios` or `pnpm android`.
 
+## iOS 26 Liquid Glass
+
+The iOS build uses native `react-native-bottom-tabs` navigation and `expo-glass-effect` surfaces on iOS 26. Android and web use the same component API with translucent RGBA fallbacks, so neither platform loads the iOS-only native glass implementation.
+
+Native tabs are not available in Expo Go. Use an iOS development build with Xcode 26 and an iOS 26 simulator or device:
+
+```bash
+pnpm exec expo prebuild --platform ios
+pnpm ios
+```
+
+After changing Expo, React Native, Hermes, or another native dependency, stop any older Metro processes and rebuild the development client with `pnpm ios`. Reusing a client binary from an older SDK against a newer JavaScript bundle can fail before application code loads. If Metro's cache also predates the upgrade, restart it once with `pnpm exec expo start --dev-client --clear`.
+
+The shared `GlassSurface` component checks both Expo glass availability APIs before rendering `GlassView`; older iOS releases fall back to a standard translucent view. The current UI has no `FlatList`, `SectionList`, or `VirtualizedList` instances near navigation or headers. `@legendapp/list` is installed for future virtualized navigation content and should be used instead of adding a new `FlatList` in those layouts.
+
 ## Test the complete demo
 
 1. Choose Student or Teacher, select **Send demo OTP**, then verify with `123456`. Admin access is available only in the web application.

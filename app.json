@@ -11,6 +11,7 @@
       "bundleIdentifier": "com.anonymous.E-Lern"
     },
     "android": {
+      "package": "com.barzy.elern",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,7 +24,8 @@
     },
     "plugins": [
       "expo-video",
-      "expo-build-properties"
+      "expo-build-properties",
+      "react-native-bottom-tabs"
     ]
   }
 }

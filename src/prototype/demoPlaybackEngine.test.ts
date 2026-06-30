@@ -23,8 +23,8 @@ function setup() {
 }
 
 describe('demo playback engine', () => {
-  it('provides student, teacher, and admin demo roles', () => {
-    expect(createDemoState().users.map((user) => user.role)).toEqual(['student', 'admin', 'teacher']);
+  it('provides student, parent, teacher, and admin demo roles', () => {
+    expect(createDemoState().users.map((user) => user.role)).toEqual(['student', 'admin', 'teacher', 'parent']);
   });
 
   it('registers a device and creates a 90 second lock', () => {

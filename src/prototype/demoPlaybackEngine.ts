@@ -5,11 +5,11 @@ export const HEARTBEAT_INTERVAL_SECONDS = 20;
 export const VIDEO_TOKEN_TTL_SECONDS = 60;
 
 export type DemoUser = {
-  id: 'user_123' | 'user_456' | 'user_789';
+  id: 'user_123' | 'user_456' | 'user_789' | 'user_654';
   name: string;
   email: string;
   username: string;
-  role: 'student' | 'teacher' | 'admin';
+  role: 'student' | 'parent' | 'teacher' | 'admin';
 };
 
 export type DemoDevice = {
@@ -114,6 +114,7 @@ const users: DemoUser[] = [
   { id: 'user_123', name: 'Darya Ahmed', email: 'darya@example.com', username: 'darya.ahmed', role: 'student' },
   { id: 'user_456', name: 'Soran Karim', email: 'soran@example.com', username: 'soran.karim', role: 'admin' },
   { id: 'user_789', name: 'Ahmed Hassan', email: 'ahmed.teacher@example.com', username: 'ahmed.hassan', role: 'teacher' },
+  { id: 'user_654', name: 'Nawroz Kamal', email: 'nawroz@example.com', username: 'nawroz.kamal', role: 'parent' },
 ];
 
 export function createDemoState(nowMs = Date.now()): DemoPlaybackState {

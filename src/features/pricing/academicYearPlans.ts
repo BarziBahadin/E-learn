@@ -57,9 +57,9 @@ export const pricingPlans: readonly PricingPlan[] = [
     shortName: 'Gold',
     retailPriceIQD: 199_000,
     unlocks: 'Fixed core science trio',
-    allowedPaths: [['Mathematics', 'Physics', 'Chemistry']],
+    allowedPaths: [['Biology', 'Physics', 'Chemistry']],
     payoutStructure: {
-      mathematicsTeacherShare: 40_000,
+      biologyTeacherShare: 40_000,
       physicsTeacherShare: 40_000,
       chemistryTeacherShare: 40_000,
       platformMargin: 79_000,

@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronRight,
   FlaskConical,
-  Image as ImageIcon,
   Laptop,
   LockKeyhole,
   Menu,
@@ -22,11 +21,13 @@ import {
   X,
 } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  Image,
   LayoutChangeEvent,
+  Linking,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -40,6 +41,7 @@ import {
   pricingPlans,
   type PricingPlanId,
 } from '../features/pricing/academicYearPlans';
+import { GlassSurface } from '../ui/GlassSurface';
 
 type LandingPageProps = {
   onStartDemo: (planId?: PricingPlanId) => void;
@@ -87,10 +89,16 @@ const subjects = [
 ] as const;
 
 const teachers = [
-  { name: 'Hawkar Ahmed', subject: 'Physics', credential: 'BSc Physics · 10+ years teaching' },
-  { name: 'Shilan Omer', subject: 'Mathematics', credential: 'BSc Mathematics · 8+ years teaching' },
-  { name: 'Karzan Mohammed', subject: 'Chemistry', credential: 'BSc Chemistry · 9+ years teaching' },
+  { name: 'Hawkar Ahmed', subject: 'Physics', credential: 'BSc Physics · 10+ years teaching', image: require('../../assets/perspon/christopher-campbell-rDEOVtE7vOs-unsplash.jpg') },
+  { name: 'Shilan Omer', subject: 'Mathematics', credential: 'BSc Mathematics · 8+ years teaching', image: require('../../assets/perspon/ian-dooley-d1UPkiFd04A-unsplash.jpg') },
+  { name: 'Karzan Mohammed', subject: 'Chemistry', credential: 'BSc Chemistry · 9+ years teaching', image: require('../../assets/perspon/joseph-gonzalez-iFgRcqHznqg-unsplash.jpg') },
 ];
+
+const landingImages = {
+  hero: require('../../assets/unseen-studio-s9CC2SKySJM-unsplash.jpg'),
+  journey: require('../../assets/priscilla-du-preez-XkKCui44iM0-unsplash.jpg'),
+  parent: require('../../assets/juan-hilario-3fiztRMJPr8-unsplash.jpg'),
+};
 
 const testimonials = [
   {
@@ -105,14 +113,10 @@ const testimonials = [
   },
 ];
 
-function MediaSlot({ label, compact = false }: { label: string; compact?: boolean }) {
+function MediaSlot({ label, source, compact = false }: { label: string; source: number; compact?: boolean }) {
   return (
-    <View accessibilityLabel={`${label} placeholder`} style={[styles.mediaSlot, compact && styles.mediaSlotCompact]}>
-      <View style={styles.mediaSlotIcon}>
-        <ImageIcon color={palette.blue} size={compact ? 18 : 24} strokeWidth={1.7} />
-      </View>
-      <Text style={styles.mediaSlotLabel}>{label}</Text>
-      <Text style={styles.mediaSlotHint}>Your photo will go here</Text>
+    <View accessibilityLabel={label} style={[styles.mediaSlot, compact && styles.mediaSlotCompact]}>
+      <Image resizeMode="cover" source={source} style={styles.mediaImage} />
     </View>
   );
 }
@@ -132,14 +136,17 @@ function LandingButton({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        secondary ? styles.buttonSecondary : styles.buttonPrimary,
-        pressed && styles.buttonPressed,
-      ]}
+      style={({ pressed }) => [pressed && styles.buttonPressed]}
     >
-      {icon}
-      <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>
+      <GlassSurface
+        glassStyle={styles.nativeGlassClear}
+        interactive
+        style={[styles.button, secondary ? styles.buttonSecondary : styles.buttonPrimary]}
+        tintColor={secondary ? 'rgba(255,255,255,0.7)' : palette.blue}
+      >
+        {icon}
+        <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>
+      </GlassSurface>
     </Pressable>
   );
 }
@@ -166,6 +173,13 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
   const goTo = (key: SectionKey) => {
     setMenuOpen(false);
     scrollRef.current?.scrollTo({ animated: true, y: Math.max(0, sectionOffsets.current[key] - 74) });
+  };
+
+  const openStore = (store: 'ios' | 'android') => {
+    const url = store === 'ios'
+      ? 'https://apps.apple.com/us/search?term=E-Lern'
+      : 'https://play.google.com/store/search?q=E-Lern&c=apps';
+    Linking.openURL(url).catch(() => undefined);
   };
 
   const navItems: Array<{ label: string; section: SectionKey }> = [
@@ -204,8 +218,8 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
                 <Text style={styles.signInText}>Sign in</Text>
               </Pressable>
             )}
-            <Pressable onPress={() => onStartDemo()} style={styles.headerCta}>
-              <Text style={styles.headerCtaText}>Try the demo</Text>
+            <Pressable onPress={() => compact ? scrollRef.current?.scrollToEnd({ animated: true }) : onStartDemo()} style={styles.headerCta}>
+              <Text style={styles.headerCtaText}>{compact ? 'Get the app' : 'Try the demo'}</Text>
             </Pressable>
             {compact && (
               <Pressable accessibilityLabel={menuOpen ? 'Close menu' : 'Open menu'} onPress={() => setMenuOpen((open) => !open)} style={styles.menuButton}>
@@ -222,8 +236,8 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
                 <ChevronRight color={palette.muted} size={17} />
               </Pressable>
             ))}
-            <Pressable onPress={() => onStartDemo()} style={styles.mobileNavLink}>
-              <Text style={styles.mobileNavText}>Sign in</Text>
+            <Pressable onPress={() => scrollRef.current?.scrollToEnd({ animated: true })} style={styles.mobileNavLink}>
+              <Text style={styles.mobileNavText}>Download the student app</Text>
               <ChevronRight color={palette.muted} size={17} />
             </Pressable>
           </View>
@@ -248,8 +262,8 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
               <LandingButton
                 secondary
                 icon={<Play color={palette.blue} fill={palette.blue} size={15} />}
-                label="Watch a free preview"
-                onPress={() => onStartDemo()}
+                label={compact ? 'Get the student app' : 'Watch a free preview'}
+                onPress={() => compact ? scrollRef.current?.scrollToEnd({ animated: true }) : onStartDemo()}
               />
             </View>
             <View style={styles.heroProof}>
@@ -260,15 +274,15 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
           </View>
 
           <View style={[styles.heroMedia, compact && styles.heroMediaCompact]}>
-            <MediaSlot label="Hero student photo" />
-            <View style={styles.floatingProgress}>
+            <MediaSlot label="Student learning with E-Lern" source={landingImages.hero} />
+            <GlassSurface glassStyle={styles.nativeGlassClear} style={styles.floatingProgress} tintColor="rgba(255,255,255,0.5)">
               <View style={styles.progressIcon}><TrendingUp color={palette.green} size={17} /></View>
               <View><Text style={styles.floatingLabel}>Weekly progress</Text><Text style={styles.floatingValue}>On track</Text></View>
-            </View>
-            <View style={styles.floatingPractice}>
+            </GlassSurface>
+            <GlassSurface glassStyle={styles.nativeGlassClear} style={styles.floatingPractice} tintColor="rgba(237,245,255,0.45)">
               <Atom color={palette.blue} size={17} />
               <Text style={styles.floatingValue}>Practice Physics</Text>
-            </View>
+            </GlassSurface>
           </View>
         </View>
 
@@ -340,12 +354,14 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
           </View>
           <View style={[styles.pricingGrid, compact && styles.pricingGridCompact]}>
             {pricingPlans.map((plan) => (
-              <View
+              <GlassSurface
+                glassStyle={styles.nativeGlassClear}
                 key={plan.id}
                 style={[
                   styles.pricingCard,
                   plan.id === 'platinum' && styles.pricingCardPlatinum,
                 ]}
+                tintColor={plan.id === 'platinum' ? 'rgba(7,60,133,0.72)' : 'rgba(255,255,255,0.52)'}
               >
                 <View style={styles.pricingCardHeader}>
                   <Text style={[styles.pricingTier, plan.id === 'platinum' && styles.pricingTextLight]}>{plan.tierName}</Text>
@@ -375,11 +391,11 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
                 ) : (
                   <Text style={styles.pricingPathHint}>Choose Mathematics, Physics, Chemistry, Biology, English, Kurdish, or Arabic.</Text>
                 )}
-                <Pressable onPress={() => onStartDemo(plan.id)} style={[styles.pricingCta, plan.id === 'platinum' && styles.pricingCtaPlatinum]}>
+                <Pressable onPress={() => compact ? scrollRef.current?.scrollToEnd({ animated: true }) : onStartDemo(plan.id)} style={[styles.pricingCta, plan.id === 'platinum' && styles.pricingCtaPlatinum]}>
                   <Text style={[styles.pricingCtaText, plan.id === 'platinum' && styles.pricingCtaTextPlatinum]}>Choose {plan.shortName}</Text>
                   <ArrowRight color={plan.id === 'platinum' ? palette.blueDark : palette.white} size={15} />
                 </Pressable>
-              </View>
+              </GlassSurface>
             ))}
           </View>
           <View style={styles.pricingRuleRow}>
@@ -399,7 +415,7 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
           <View style={[styles.teacherGrid, compact && styles.teacherGridCompact]}>
             {teachers.map((teacher) => (
               <View key={teacher.name} style={styles.teacherProfile}>
-                <MediaSlot compact label={`${teacher.name} portrait`} />
+                <MediaSlot compact label={`${teacher.name} portrait`} source={teacher.image} />
                 <Text style={styles.teacherName}>{teacher.name}</Text>
                 <Text style={styles.teacherSubject}>{teacher.subject}</Text>
                 <Text style={styles.teacherCredential}>{teacher.credential}</Text>
@@ -427,13 +443,13 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
                 </View>
               ))}
             </View>
-            <View style={styles.journeyMedia}><MediaSlot label="Learning journey photo" /></View>
+            <View style={styles.journeyMedia}><MediaSlot label="Student learning journey" source={landingImages.journey} /></View>
           </View>
         </View>
 
         <View onLayout={captureSection('parents')} style={[styles.section, styles.parentSection]}>
           <View style={[styles.parentLayout, compact && styles.parentLayoutCompact]}>
-            <View style={styles.parentMedia}><MediaSlot label="Parent and student photo" /></View>
+            <View style={styles.parentMedia}><MediaSlot label="Parent supporting a student" source={landingImages.parent} /></View>
             <View style={styles.parentCopy}>
               <Text style={styles.sectionKicker}>FOR FAMILIES</Text>
               <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>Peace of mind for <Text style={styles.sectionTitleAccent}>parents.</Text></Text>
@@ -478,12 +494,12 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
             <Text style={[styles.finalCtaTitle, compact && styles.finalCtaTitleCompact]}>Your strongest year starts here.</Text>
             <Text style={styles.finalCtaText}>
               {Platform.OS === 'web'
-                ? 'Explore the complete E-Lern prototype as a student, teacher, or web administrator.'
+                ? compact ? 'The website introduces E-Lern; lessons and progress live in the dedicated iOS and Android apps.' : 'Explore E-Lern courses and teachers, or sign in to the desktop administration workspace.'
                 : 'Explore the complete E-Lern mobile experience as a student or teacher.'}
             </Text>
           </View>
           <View style={[styles.finalCtaActions, narrow && styles.heroActionsNarrow]}>
-            <LandingButton label="Open E-Lern demo" onPress={() => onStartDemo()} />
+            {compact ? <><LandingButton label="Download for iOS" onPress={() => openStore('ios')} /><LandingButton secondary label="Download for Android" onPress={() => openStore('android')} /></> : <LandingButton label="Open E-Lern demo" onPress={() => onStartDemo()} />}
             <LandingButton secondary label="Browse courses" onPress={() => goTo('courses')} />
           </View>
         </View>
@@ -544,13 +560,15 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
   buttonText: { color: palette.white, fontSize: 14, fontWeight: '800' },
   buttonTextSecondary: { color: palette.blue },
+  nativeGlassClear: { backgroundColor: 'transparent', borderColor: 'transparent' },
   heroProof: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginTop: 36 },
   proofItem: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   proofText: { color: palette.ink, fontSize: 11, fontWeight: '600' },
   heroMedia: { flex: 0.95, minHeight: 650, padding: 28, position: 'relative' },
   heroMediaCompact: { minHeight: 500, paddingHorizontal: 22, paddingVertical: 0 },
-  mediaSlot: { alignItems: 'center', backgroundColor: palette.sand, borderColor: '#d4c8b6', borderRadius: 2, borderStyle: 'dashed', borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 260, overflow: 'hidden', padding: 24 },
+  mediaSlot: { alignItems: 'center', backgroundColor: palette.sand, borderRadius: 8, flex: 1, justifyContent: 'center', minHeight: 260, overflow: 'hidden' },
   mediaSlotCompact: { minHeight: 270 },
+  mediaImage: { height: '100%', width: '100%' },
   mediaSlotIcon: { alignItems: 'center', backgroundColor: palette.paper, borderRadius: 24, height: 48, justifyContent: 'center', marginBottom: 10, width: 48 },
   mediaSlotLabel: { color: palette.ink, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   mediaSlotHint: { color: palette.muted, fontSize: 11, marginTop: 4, textAlign: 'center' },

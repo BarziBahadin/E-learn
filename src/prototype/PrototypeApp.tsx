@@ -5,6 +5,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Building2,
   BookOpen,
   CreditCard,
   Check,
@@ -15,8 +16,10 @@ import {
   Clock3,
   Database,
   Download,
+  DollarSign,
   Gauge,
   GraduationCap,
+  HeartHandshake,
   KeyRound,
   Laptop,
   ListChecks,
@@ -31,9 +34,11 @@ import {
   ShieldAlert,
   ShieldCheck,
   Smartphone,
+  Search,
   Square,
   Send,
   TicketCheck,
+  WalletCards,
   TimerOff,
   Upload,
   Users,
@@ -42,12 +47,12 @@ import {
   WifiOff,
   Zap,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -108,9 +113,20 @@ import {
   type AcademicSubject,
   type PricingPlanId,
 } from '../features/pricing/academicYearPlans';
+import { NativeTabShell } from '../navigation/NativeTabShell';
+import { GlassSurface } from '../ui/GlassSurface';
+import { useThemePreference, type ThemePreference } from '../features/theme/useThemePreference';
+import {
+  adminUsers,
+  guardianStudents,
+  initialWallet,
+  revenueRows,
+  type WalletTransaction,
+} from './commerceDemoData';
+import type { AppleIcon } from 'react-native-bottom-tabs';
 
-type Page = 'Discover' | 'Courses' | 'Plans' | 'Course' | 'Checkout' | 'Lesson' | 'Status' | 'Notifications' | 'Teacher' | 'Admin' | 'Profile';
-type AdminView = 'Overview' | 'Content' | 'Plans' | 'Payments' | 'Coupons' | 'Sessions' | 'Risk events' | 'Devices' | 'Notifications' | 'Audit logs';
+type Page = 'Discover' | 'Courses' | 'Plans' | 'Wallet' | 'Guardian' | 'Course' | 'Checkout' | 'Lesson' | 'Status' | 'Notifications' | 'Teacher' | 'Admin' | 'Profile';
+type AdminView = 'Overview' | 'Revenue' | 'Users' | 'Vouchers' | 'Content' | 'Plans' | 'Payments' | 'Sessions' | 'Risk events' | 'Devices' | 'Notifications' | 'Audit logs';
 type ClientSession = {
   sessionId: string;
   deviceId: string;
@@ -124,7 +140,8 @@ const VIDEO_SOURCE = require('../../assets/mixkit-hands-of-a-person-typing-on-a-
 
 const isIOS = Platform.OS === 'ios';
 
-const colors = {
+const lightColors = {
+  mode: 'light' as 'light' | 'dark',
   ink: isIOS ? '#1c1c1e' : '#17221f',
   muted: isIOS ? '#6c6c70' : '#65736e',
   subtle: isIOS ? '#8e8e93' : '#87938e',
@@ -143,7 +160,45 @@ const colors = {
   charcoal: isIOS ? '#000000' : '#111916',
 };
 
+const darkColors: typeof lightColors = {
+  ...lightColors,
+  mode: 'dark',
+  ink: '#f2f7f4',
+  muted: '#a8b5b0',
+  subtle: '#84928d',
+  border: '#31413b',
+  canvas: '#0c1210',
+  white: '#17201d',
+  green: '#64c998',
+  greenDark: '#42a979',
+  greenSoft: '#1b352a',
+  blue: '#7ab8ff',
+  blueSoft: '#182c42',
+  amber: '#f0aa55',
+  amberSoft: '#382817',
+  red: '#ff8179',
+  redSoft: '#3e211f',
+  charcoal: '#050806',
+};
+
+type PrototypeThemeContextValue = {
+  colors: typeof lightColors;
+  styles: ReturnType<typeof createStyles>;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
+  resolvedTheme: 'light' | 'dark';
+};
+
+const PrototypeThemeContext = createContext<PrototypeThemeContextValue | null>(null);
+
+function usePrototypeTheme() {
+  const value = useContext(PrototypeThemeContext);
+  if (!value) throw new Error('Prototype theme provider is missing.');
+  return value;
+}
+
 function Pill({ label, tone = 'neutral' }: { label: string; tone?: 'success' | 'warning' | 'danger' | 'neutral' }) {
+  const { styles } = usePrototypeTheme();
   const toneStyle =
     tone === 'success' ? styles.pillSuccess
       : tone === 'warning' ? styles.pillWarning
@@ -170,44 +225,61 @@ function Button({
   tone?: 'primary' | 'secondary' | 'danger' | 'warning';
   disabled?: boolean;
 }) {
+  const { colors, styles } = usePrototypeTheme();
   const buttonStyle =
     tone === 'secondary' ? styles.buttonSecondary
       : tone === 'danger' ? styles.buttonDanger
         : tone === 'warning' ? styles.buttonWarning
           : styles.buttonPrimary;
   const textStyle = tone === 'secondary' ? styles.buttonTextSecondary : styles.buttonTextLight;
+  const tintColor = tone === 'danger'
+    ? colors.red
+    : tone === 'warning'
+      ? colors.amber
+      : tone === 'secondary'
+        ? 'rgba(255, 255, 255, 0.72)'
+        : colors.greenDark;
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, buttonStyle, pressed && styles.pressed, disabled && styles.disabled]}
+      style={({ pressed }) => [pressed && styles.pressed, disabled && styles.disabled]}
     >
-      {icon}
-      <Text style={[styles.buttonText, textStyle]}>{label}</Text>
+      <GlassSurface
+        glassStyle={styles.nativeGlassClear}
+        interactive
+        style={[styles.button, buttonStyle]}
+        tintColor={tintColor}
+      >
+        {icon}
+        <Text style={[styles.buttonText, textStyle]}>{label}</Text>
+      </GlassSurface>
     </Pressable>
   );
 }
 
 function Metric({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) {
+  const { styles } = usePrototypeTheme();
   return (
-    <View style={styles.metric}>
+    <GlassSurface glassStyle={styles.nativeGlassClear} style={styles.metric} tintColor="rgba(255,255,255,0.55)">
       <View style={styles.metricIcon}>{icon}</View>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={styles.metricValue}>{value}</Text>
       <Text style={styles.metricNote}>{note}</Text>
-    </View>
+    </GlassSurface>
   );
 }
 
-export default function PrototypeApp() {
+function PrototypeExperience() {
+  const { colors, preference, resolvedTheme, setPreference, styles } = usePrototypeTheme();
   const { width } = useWindowDimensions();
   const compact = width < 780;
   const [state, setState] = useState<DemoPlaybackState>(() => createDemoState());
   const [selectedUserId, setSelectedUserId] = useState<DemoUser['id']>('user_123');
   const [currentUser, setCurrentUser] = useState<DemoUser | null>(null);
   const [currentDevice, setCurrentDevice] = useState<DemoDevice | null>(null);
-  const [showLanding, setShowLanding] = useState(true);
+  const [showLanding, setShowLanding] = useState(Platform.OS === 'web');
   const [page, setPage] = useState<Page>('Courses');
   const [adminView, setAdminView] = useState<AdminView>('Overview');
   const [selectedCourseId, setSelectedCourseId] = useState('course_001');
@@ -230,7 +302,7 @@ export default function PrototypeApp() {
   const [selectedPricingPlanId, setSelectedPricingPlanId] = useState<PricingPlanId>('bronze');
   const [selectedPricingPathIndex, setSelectedPricingPathIndex] = useState(0);
   const [pendingPricingPlanId, setPendingPricingPlanId] = useState<PricingPlanId | null>(null);
-  const [unlockMethod, setUnlockMethod] = useState<'Coupon' | 'Manual payment' | 'Online payment'>('Coupon');
+  const [unlockMethod, setUnlockMethod] = useState<'Wallet' | 'Coupon' | 'Manual payment' | 'Online payment'>('Wallet');
   const [couponCode, setCouponCode] = useState('WELCOME12');
   const [notifications, setNotifications] = useState(initialNotifications);
   const [supportMessage, setSupportMessage] = useState('I need help accessing my lesson attachment.');
@@ -238,6 +310,13 @@ export default function PrototypeApp() {
   const [payments, setPayments] = useState(initialPayments);
   const [coupons, setCoupons] = useState(initialCoupons);
   const [broadcastMessage, setBroadcastMessage] = useState('New Grade 12 revision lessons are now available.');
+  const [walletBalance, setWalletBalance] = useState(initialWallet.balanceIQD);
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(initialWallet.transactions);
+  const [voucherCode, setVoucherCode] = useState('EL-DEMO-WALLET-89000');
+  const [redeemedVoucherCodes, setRedeemedVoucherCodes] = useState<string[]>([]);
+  const [revenueRange, setRevenueRange] = useState<'Today' | 'This week' | 'This month'>('This month');
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedAdminUserId, setSelectedAdminUserId] = useState(adminUsers[0].id);
 
   const player = useVideoPlayer(VIDEO_SOURCE, (videoPlayer) => {
     videoPlayer.loop = true;
@@ -268,6 +347,10 @@ export default function PrototypeApp() {
     .find((lesson) => lesson.available);
   const checkoutCourse = studentCourses.find((course) => course.id === checkoutCourseId) ?? studentCourses[0];
   const selectedPricingPlan = pricingPlanById(selectedPricingPlanId);
+  const filteredAdminUsers = useMemo(() => adminUsers.filter((user) =>
+    `${user.name} ${user.email} ${user.id}`.toLowerCase().includes(userSearch.trim().toLowerCase()),
+  ), [userSearch]);
+  const selectedAdminUser = filteredAdminUsers.find((user) => user.id === selectedAdminUserId) ?? filteredAdminUsers[0];
   const selectedPlanSubjects = subjectsForPlan(selectedPricingPlan, {
     pathIndex: selectedPricingPathIndex,
     standaloneSubject: checkoutCourse.category as AcademicSubject,
@@ -515,12 +598,26 @@ export default function PrototypeApp() {
       setNotice('Coupon rejected by the demo validation function. Try WELCOME12.');
       return;
     }
+    if (unlockMethod === 'Wallet' && walletBalance < selectedPricingPlan.retailPriceIQD) {
+      setNotice(`Wallet balance is insufficient. Add ${formatIQD(selectedPricingPlan.retailPriceIQD - walletBalance)} to continue.`);
+      return;
+    }
     const unlockedCourses = studentCourses.filter((course) =>
       selectedPlanSubjects.includes(course.category as AcademicSubject),
     );
     const unlockedCourseIds = unlockedCourses.map((course) => course.id);
     setEnrolledCourseIds((current) => Array.from(new Set([...current, ...unlockedCourseIds])));
     const course = unlockedCourses[0] ?? checkoutCourse;
+    if (unlockMethod === 'Wallet') {
+      setWalletBalance((current) => current - selectedPricingPlan.retailPriceIQD);
+      setWalletTransactions((current) => [{
+        id: `WTX-${1042 + current.length}`,
+        kind: selectedPricingPlan.id === 'bronze' ? 'course_purchase' : 'subscription_purchase',
+        title: selectedPricingPlan.id === 'bronze' ? course.title : selectedPricingPlan.tierName,
+        amountIQD: -selectedPricingPlan.retailPriceIQD,
+        createdAt: 'Just now',
+      }, ...current]);
+    }
     setNotice(
       unlockMethod === 'Manual payment'
         ? `Payment proof uploaded for ${selectedPricingPlan.tierName}. Demo admin approval completed and access is active.`
@@ -528,7 +625,24 @@ export default function PrototypeApp() {
     );
     setPendingPricingPlanId(null);
     if (course) openCourse(course);
-  }, [checkoutCourse, couponCode, openCourse, selectedPlanSubjects, selectedPricingPlan, unlockMethod]);
+  }, [checkoutCourse, couponCode, openCourse, selectedPlanSubjects, selectedPricingPlan, unlockMethod, walletBalance]);
+
+  const redeemVoucher = useCallback(() => {
+    const normalized = voucherCode.trim().toUpperCase();
+    if (normalized !== 'EL-DEMO-WALLET-89000') {
+      setNotice('Voucher was not found, has expired, or is disabled.');
+      return;
+    }
+    if (redeemedVoucherCodes.includes(normalized)) {
+      setNotice('This voucher has already been redeemed.');
+      return;
+    }
+    setRedeemedVoucherCodes((current) => [...current, normalized]);
+    setWalletBalance((current) => current + 89_000);
+    setWalletTransactions((current) => [{ id: `WTX-${1042 + current.length}`, kind: 'voucher_redemption', title: 'Voucher redeemed', amountIQD: 89_000, createdAt: 'Just now' }, ...current]);
+    setVoucherCode('');
+    setNotice('Voucher redeemed atomically. 89,000 IQD was added to your wallet.');
+  }, [redeemedVoucherCodes, voucherCode]);
 
   const submitSupportTicket = useCallback(() => {
     if (!supportMessage.trim()) {
@@ -690,7 +804,7 @@ export default function PrototypeApp() {
                     <View style={styles.userOptionCopy}>
                       <View style={styles.userNameLine}>
                         <Text style={styles.userName}>{user.name}</Text>
-                        <Pill label={user.role === 'student' ? 'Student' : user.role === 'teacher' ? 'Teacher' : 'Admin'} tone={user.role === 'student' ? 'success' : 'warning'} />
+                        <Pill label={user.role === 'student' ? 'Student' : user.role === 'parent' ? 'Parent' : user.role === 'teacher' ? 'Teacher' : 'Admin'} tone={user.role === 'student' ? 'success' : 'warning'} />
                       </View>
                       <Text style={styles.userMeta}>{user.id} · {user.email}</Text>
                     </View>
@@ -727,7 +841,9 @@ export default function PrototypeApp() {
   const userInitials = currentUser.name.split(' ').map((part) => part[0]).join('').slice(0, 2);
   const desktopWeb = Platform.OS === 'web' && width >= 920;
   const roleNavigation: Page[] = currentUser.role === 'student'
-    ? (desktopWeb ? ['Discover', 'Courses', 'Plans', 'Notifications', 'Status', 'Profile'] : isIOS ? ['Discover', 'Courses', 'Plans', 'Notifications', 'Profile'] : ['Discover', 'Courses', 'Plans', 'Notifications'])
+    ? (desktopWeb ? ['Discover', 'Courses', 'Plans', 'Wallet', 'Notifications', 'Status', 'Profile'] : isIOS ? ['Discover', 'Courses', 'Plans', 'Wallet', 'Profile'] : ['Discover', 'Courses', 'Plans', 'Wallet'])
+    : currentUser.role === 'parent'
+      ? ['Guardian', 'Profile']
     : currentUser.role === 'teacher'
       ? (desktopWeb || isIOS ? ['Teacher', 'Profile'] : ['Teacher'])
       : (desktopWeb || isIOS ? ['Admin', 'Status', 'Profile'] : ['Admin', 'Status']);
@@ -736,45 +852,20 @@ export default function PrototypeApp() {
     : item === 'Plans'
       ? ['Plans', 'Checkout'].includes(page)
       : page === item;
-  const navigation = (
-    <View style={[styles.bottomNavItems, isIOS && styles.bottomNavItemsIOS]}>
-      {roleNavigation.map((item) => {
-        const active = isNavigationActive(item);
-        return (
-          <Pressable
-            accessibilityLabel={`${item} section`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            key={item}
-            onPress={() => setPage(item)}
-            style={({ pressed }) => [
-              styles.bottomNavItem,
-              isIOS && styles.bottomNavItemIOS,
-              pressed && styles.bottomNavPressed,
-            ]}
-          >
-            <View style={[
-              styles.bottomNavIcon,
-              isIOS && styles.bottomNavIconIOS,
-              active && styles.bottomNavIconActive,
-              isIOS && active && styles.bottomNavIconActiveIOS,
-            ]}>
-              {navigationIcon(item, active)}
-            </View>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.bottomNavLabel,
-                isIOS && styles.bottomNavLabelIOS,
-                active && styles.bottomNavLabelActive,
-              ]}
-            >
-              {item}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+  const activeNavigationPage = roleNavigation.find(isNavigationActive) ?? roleNavigation[0];
+  const tabRoutes = roleNavigation.map((item) => ({
+    icon: navigationIcon(item, isNavigationActive(item), colors),
+    key: item,
+    sfSymbol: navigationSymbol(item),
+    title: item,
+  }));
+  const discoverSubjects = subjects.filter((subject) =>
+    teachers.some((teacher) => teacher.subjectId === subject.id),
+  );
+  const discoverTeachers = teachers
+    .filter((teacher) => teacher.subjectId === selectedSubjectId);
+  const discoverCourses = studentCourses.filter(
+    (courseItem) => courseItem.category.toLowerCase() === selectedSubjectId,
   );
   const profileTrigger = (
     <Pressable accessibilityLabel="Open profile" accessibilityRole="button" onPress={() => setPage('Profile')} style={({ pressed }) => [styles.profileTrigger, desktopWeb && styles.webProfileTrigger, pressed && styles.pressed]}>
@@ -807,6 +898,12 @@ export default function PrototypeApp() {
         </View>
       </View>
 
+      <NativeTabShell
+        activeKey={activeNavigationPage}
+        disabled={desktopWeb}
+        onSelect={(key) => setPage(key as Page)}
+        routes={tabRoutes}
+      >
       <View style={[styles.appBody, desktopWeb && styles.webAppBody]}>
         {desktopWeb && (
           <View style={styles.webSidebar}>
@@ -822,7 +919,7 @@ export default function PrototypeApp() {
                     onPress={() => setPage(item)}
                     style={({ pressed }) => [styles.webNavItem, active && styles.webNavItemActive, pressed && styles.pressed]}
                   >
-                    <View style={[styles.webNavIcon, active && styles.webNavIconActive]}>{navigationIcon(item, active)}</View>
+                    <View style={[styles.webNavIcon, active && styles.webNavIconActive]}>{navigationIcon(item, active, colors)}</View>
                     <Text style={[styles.webNavLabel, active && styles.webNavLabelActive]}>{item}</Text>
                   </Pressable>
                 );
@@ -835,6 +932,10 @@ export default function PrototypeApp() {
                 <Text style={styles.webSidebarFooterText}>One active playback device</Text>
               </View>
             </View>
+            <Pressable accessibilityRole="button" onPress={switchUser} style={({ pressed }) => [styles.sidebarSignOut, pressed && styles.pressed]}>
+              <LogOut color="#f5b4ae" size={18} />
+              <Text style={styles.sidebarSignOutText}>Sign out</Text>
+            </Pressable>
           </View>
         )}
 
@@ -862,45 +963,86 @@ export default function PrototypeApp() {
           )}
 
           {page === 'Discover' && currentUser.role === 'student' && (
-            <View style={styles.pageStack}>
-              <View style={styles.pageHeader}>
-                <View><Text style={styles.overline}>GRADE 12 CURRICULUM</Text><Text style={styles.pageTitle}>Find your next course</Text><Text style={styles.pageSubtitle}>Choose a subject, compare teachers, preview a lesson, and unlock the full course.</Text></View>
-                <Pill label="Realtime catalog" tone="success" />
+            <View style={styles.discoverStack}>
+              <View style={[styles.discoverHero, desktopWeb && styles.webDiscoverHero]}>
+                <Text style={styles.overline}>GRADE 12 CURRICULUM</Text>
+                <Text style={styles.pageTitle}>Find your next course</Text>
+                <Text style={styles.pageSubtitle}>Choose a subject, compare teachers, preview a lesson, and unlock the full course.</Text>
+                <View style={styles.discoverCatalogPill}><Pill label="Realtime catalog" tone="success" /></View>
               </View>
-              <View style={styles.sectionBlock}>
-                <Text style={styles.panelEyebrow}>1 · CHOOSE A SUBJECT</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
-                  {subjects.map((subject) => (
-                    <Pressable key={subject.id} onPress={() => { setSelectedSubjectId(subject.id); const first = teachers.find((teacher) => teacher.subjectId === subject.id); if (first) setSelectedTeacherId(first.id); }} style={[styles.choiceCard, selectedSubjectId === subject.id && styles.choiceCardSelected]}>
-                      <BookOpen color={selectedSubjectId === subject.id ? colors.white : colors.green} size={20} />
-                      <Text style={[styles.choiceTitle, selectedSubjectId === subject.id && styles.choiceTextSelected]}>{subject.name}</Text>
-                      <Text style={[styles.choiceMeta, selectedSubjectId === subject.id && styles.choiceTextSelected]}>{subject.teacherCount} teachers · {subject.courseCount} courses</Text>
+              <View style={[styles.discoverSubjectSection, desktopWeb && styles.webDiscoverSubjectSection]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoverSubjectRow}>
+                  {discoverSubjects.map((subject) => {
+                    const selected = selectedSubjectId === subject.id;
+                    return (
+                    <Pressable
+                      accessibilityLabel={`${subject.name}, ${subject.teacherCount} teachers and ${subject.courseCount} courses`}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                      key={subject.id}
+                      onPress={() => {
+                        setSelectedSubjectId(subject.id);
+                        const first = teachers.find((teacher) => teacher.subjectId === subject.id);
+                        if (first) setSelectedTeacherId(first.id);
+                      }}
+                      style={({ pressed }) => [styles.discoverSubjectChip, selected && styles.discoverSubjectChipSelected, pressed && styles.pressed]}
+                    >
+                      <BookOpen color={selected ? colors.white : colors.green} size={20} />
+                      <Text style={[styles.discoverSubjectText, selected && styles.choiceTextSelected]}>{subject.name}</Text>
                     </Pressable>
-                  ))}
+                    );
+                  })}
                 </ScrollView>
               </View>
-              <View style={styles.sectionBlock}>
+              <View style={styles.discoverSection}>
                 <Text style={styles.panelEyebrow}>2 · CHOOSE A TEACHER</Text>
-                <View style={[styles.courseGrid, compact && styles.courseGridCompact]}>
-                  {teachers.filter((teacher) => teacher.subjectId === selectedSubjectId).map((teacher) => (
-                    <Pressable key={teacher.id} onPress={() => setSelectedTeacherId(teacher.id)} style={[styles.teacherCard, selectedTeacherId === teacher.id && styles.teacherCardSelected]}>
-                      <View style={styles.teacherAvatar}><Text style={styles.avatarText}>{teacher.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
-                      <View style={styles.teacherCopy}><Text style={styles.courseCardTitle}>{teacher.name}</Text><Text style={styles.teacherSubject}>{teacher.subject}</Text><Text style={styles.courseCardDescription}>{teacher.bio}</Text><Text style={styles.courseStat}>{teacher.students} students · {teacher.completionRate}% completion</Text></View>
-                      {selectedTeacherId === teacher.id && <Check color={colors.green} size={20} />}
-                    </Pressable>
-                  ))}
+                <View style={styles.discoverTeacherList}>
+                  {discoverTeachers.map((teacher, index) => {
+                    const selected = selectedTeacherId === teacher.id;
+                    return (
+                      <Pressable
+                        accessibilityLabel={`${teacher.name}, ${teacher.subject}, ${teacher.students} students`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: selected }}
+                        key={teacher.id}
+                        onPress={() => setSelectedTeacherId(teacher.id)}
+                        style={({ pressed }) => [
+                          styles.discoverTeacherRow,
+                          selected && styles.discoverTeacherRowSelected,
+                          !selected && index < discoverTeachers.length - 1 && styles.discoverTeacherRowDivider,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={[styles.teacherAvatar, !selected && styles.discoverTeacherAvatarCompact]}><Text style={styles.avatarText}>{teacher.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
+                        <View style={styles.teacherCopy}>
+                          <Text style={styles.courseCardTitle}>{teacher.name}</Text>
+                          <Text style={styles.teacherSubject}>{teacher.subject}</Text>
+                          <Text style={styles.courseCardDescription}>{teacher.bio}</Text>
+                          <Text style={styles.courseStat}>{teacher.students} students · {teacher.completionRate}% completion</Text>
+                        </View>
+                        {selected ? <View style={styles.discoverSelectedCheck}><Check color={colors.white} size={19} /></View> : <ChevronRight color={colors.greenDark} size={22} />}
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
-              <View style={styles.sectionBlock}>
-                <Text style={styles.panelEyebrow}>3 · PREVIEW OR UNLOCK</Text>
-                <View style={[styles.courseGrid, compact && styles.courseGridCompact]}>
-                  {studentCourses.map((courseItem) => {
+              <View style={styles.discoverSection}>
+                <Text style={styles.panelEyebrow}>3 · PREVIEW A COURSE</Text>
+                <View style={styles.discoverCourseList}>
+                  {discoverCourses.map((courseItem) => {
                     const enrolled = enrolledCourseIds.includes(courseItem.id);
                     return (
-                      <View key={courseItem.id} style={styles.courseCard}>
-                        <View style={styles.courseCardTop}><View style={styles.courseCategoryIcon}><CourseCategoryIcon category={courseItem.category} /></View><Pill label={enrolled ? 'Enrolled' : `Bronze · ${formatIQD(pricingPlanById('bronze').retailPriceIQD)}`} tone={enrolled ? 'success' : 'warning'} /></View>
-                        <Text style={styles.courseCardTitle}>{courseItem.title}</Text><Text style={styles.courseCardInstructor}>{courseItem.instructor}</Text><Text style={styles.courseCardDescription}>{courseItem.description}</Text>
-                        <View style={styles.actionRow}><Button label="Free preview" tone="secondary" onPress={() => previewCourse(courseItem)} /><Button label={enrolled ? 'Open course' : 'Unlock course'} onPress={() => enrolled ? openCourse(courseItem) : openCheckout(courseItem.id)} /></View>
+                      <View key={courseItem.id} style={styles.discoverCourseRow}>
+                        <View style={styles.discoverCourseIcon}><CourseCategoryIcon category={courseItem.category} size={26} /></View>
+                        <View style={styles.discoverCourseCopy}>
+                          <Text style={styles.courseCardTitle}>{courseItem.title}</Text>
+                          <Text style={styles.courseCardInstructor}>by {courseItem.instructor}</Text>
+                          <Text numberOfLines={2} style={styles.courseCardDescription}>{courseItem.description}</Text>
+                          <View style={styles.discoverCourseActions}>
+                            <Button label="Free preview" tone="secondary" onPress={() => previewCourse(courseItem)} />
+                            <Button label={enrolled ? 'Open course' : 'Unlock course'} onPress={() => enrolled ? openCourse(courseItem) : openCheckout(courseItem.id)} />
+                          </View>
+                        </View>
                       </View>
                     );
                   })}
@@ -921,7 +1063,7 @@ export default function PrototypeApp() {
               </View>
               <View style={[styles.planGrid, compact && styles.planGridCompact]}>
                 {pricingPlans.map((plan) => (
-                  <View key={plan.id} style={[styles.planCard, plan.id === 'platinum' && styles.planCardVip]}>
+                  <GlassSurface glassStyle={styles.nativeGlassClear} key={plan.id} style={[styles.planCard, plan.id === 'platinum' && styles.planCardVip]} tintColor={plan.id === 'platinum' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.5)'}>
                     <View style={styles.courseCardTop}>
                       <Text style={[styles.planName, plan.id === 'platinum' && styles.planTextVip]}>{plan.tierName}</Text>
                       <Pill label="Full year" tone={plan.id === 'platinum' ? 'warning' : 'success'} />
@@ -942,7 +1084,7 @@ export default function PrototypeApp() {
                       tone={plan.id === 'platinum' ? 'warning' : 'primary'}
                       onPress={() => openCheckout(selectedCourseId, plan.id)}
                     />
-                  </View>
+                  </GlassSurface>
                 ))}
               </View>
               <View style={styles.planRuleBanner}>
@@ -993,14 +1135,26 @@ export default function PrototypeApp() {
                   </View>
                 </View>
               )}
+              {selectedPricingPlan.id === 'bronze' && (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.fieldLabel}>Choose the course to unlock</Text>
+                  <View style={styles.pathChoiceGrid}>
+                    {studentCourses.map((course) => {
+                      const selected = checkoutCourseId === course.id;
+                      return <Pressable accessibilityState={{ selected }} key={course.id} onPress={() => setCheckoutCourseId(course.id)} style={[styles.pathChoice, selected && styles.pathChoiceSelected]}><Check color={selected ? colors.white : colors.green} size={17} /><Text style={[styles.pathChoiceText, selected && styles.pathChoiceTextSelected]}>{course.title}</Text></Pressable>;
+                    })}
+                  </View>
+                </View>
+              )}
               <View style={[styles.checkoutLayout, compact && styles.courseLayoutCompact]}>
                 <View style={styles.sectionBlock}>
                   <Text style={styles.fieldLabel}>Unlock method</Text>
-                  <View style={styles.segmented}>{(['Coupon', 'Manual payment', 'Online payment'] as const).map((method) => <Pressable key={method} onPress={() => setUnlockMethod(method)} style={[styles.segment, unlockMethod === method && styles.segmentActive]}><Text style={[styles.segmentText, unlockMethod === method && styles.segmentTextActive]}>{method}</Text></Pressable>)}</View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.segmented}>{(['Wallet', 'Coupon', 'Manual payment', 'Online payment'] as const).map((method) => <Pressable key={method} onPress={() => setUnlockMethod(method)} style={[styles.segment, unlockMethod === method && styles.segmentActive]}><Text style={[styles.segmentText, unlockMethod === method && styles.segmentTextActive]}>{method}</Text></Pressable>)}</View></ScrollView>
+                  {unlockMethod === 'Wallet' && <View style={styles.walletCheckout}><WalletCards color={colors.green} size={22} /><View style={styles.notificationCopy}><Text style={styles.registrationTitle}>{formatIQD(walletBalance)} available</Text><Text style={styles.registrationMeta}>The purchase is recorded as voucher-funded when the wallet credit came from a voucher.</Text></View></View>}
                   {unlockMethod === 'Coupon' && <><Text style={styles.fieldLabel}>Access code</Text><TextInput autoCapitalize="characters" onChangeText={setCouponCode} style={styles.textInput} value={couponCode} /><Text style={styles.helperText}>Use WELCOME12 for the successful demo path.</Text></>}
                   {unlockMethod === 'Manual payment' && <View style={styles.uploadBox}><Upload color={colors.blue} size={24} /><Text style={styles.registrationTitle}>Payment proof ready</Text><Text style={styles.registrationMeta}>fastpay-receipt.jpg · Stored in private payment-proofs bucket</Text></View>}
                   {unlockMethod === 'Online payment' && <View style={styles.uploadBox}><CreditCard color={colors.blue} size={24} /><Text style={styles.registrationTitle}>ZainCash / FastPay gateway</Text><Text style={styles.registrationMeta}>The demo returns a successful verified transaction.</Text></View>}
-                  <Button label={unlockMethod === 'Manual payment' ? 'Upload and submit' : unlockMethod === 'Coupon' ? 'Apply code and unlock' : 'Pay securely'} icon={<KeyRound color={colors.white} size={16} />} onPress={completeUnlock} />
+                  <Button label={unlockMethod === 'Manual payment' ? 'Upload and submit' : unlockMethod === 'Coupon' ? 'Apply code and unlock' : unlockMethod === 'Wallet' ? 'Pay from wallet' : 'Pay securely'} icon={<KeyRound color={colors.white} size={16} />} onPress={completeUnlock} />
                 </View>
                 <View style={styles.sessionPanel}><Text style={styles.panelEyebrow}>ORDER SUMMARY</Text><Text style={styles.panelTitle}>{selectedPricingPlan.tierName}</Text><Text style={styles.pageSubtitle}>{selectedPricingPlan.unlocks}</Text><View style={styles.detailList}><Detail label="Subjects" value={pathLabel(selectedPlanSubjects)} /><Detail label="Price" value={formatIQD(selectedPricingPlan.retailPriceIQD)} /><Detail label="Access" value="Through Aug/Sep resits" /><Detail label="Enrollment" value="Immediate after approval" /></View></View>
               </View>
@@ -1031,7 +1185,7 @@ export default function PrototypeApp() {
                   const lessons = courseLessons(courseItem);
                   const completedCount = lessons.filter((lesson) => completedLessonIds.includes(lesson.id)).length;
                   return (
-                    <View key={courseItem.id} style={styles.courseCard}>
+                    <GlassSurface glassStyle={styles.nativeGlassClear} key={courseItem.id} style={styles.courseCard} tintColor="rgba(255,255,255,0.52)">
                       <View style={styles.courseCardTop}>
                         <View style={styles.courseCategoryIcon}><CourseCategoryIcon category={courseItem.category} /></View>
                         <Pill label={courseItem.category} tone="neutral" />
@@ -1054,7 +1208,7 @@ export default function PrototypeApp() {
                         icon={<ChevronRight color={colors.white} size={16} />}
                         onPress={() => openCourse(courseItem)}
                       />
-                    </View>
+                    </GlassSurface>
                   );
                 })}
               </View>
@@ -1174,7 +1328,7 @@ export default function PrototypeApp() {
                       style={styles.video}
                       nativeControls={ownsActiveLock}
                       contentFit="contain"
-                      allowsFullscreen={false}
+                      fullscreenOptions={{ enable: false }}
                     />
                     {!ownsActiveLock && (
                       <View style={styles.videoGate}>
@@ -1212,6 +1366,29 @@ export default function PrototypeApp() {
                   </Pressable>
                 </View>
               </View>
+            </View>
+          )}
+
+          {page === 'Wallet' && currentUser.role === 'student' && (
+            <View style={styles.pageStack}>
+              <View style={styles.pageHeader}><View><Text style={styles.overline}>STUDENT WALLET</Text><Text style={styles.pageTitle}>Balance and vouchers</Text><Text style={styles.pageSubtitle}>Redeem a secure voucher, then use your balance for eligible courses and plans.</Text></View><Pill label={formatIQD(walletBalance)} tone="success" /></View>
+              <View style={[styles.checkoutLayout, compact && styles.courseLayoutCompact]}>
+                <View style={styles.walletHero}><WalletCards color={colors.green} size={30} /><Text style={styles.panelEyebrow}>AVAILABLE BALANCE</Text><Text style={styles.walletBalance}>{formatIQD(walletBalance)}</Text><Text style={styles.pageSubtitle}>Wallet liability remains tracked until funds are spent or refunded.</Text><Button label="Browse plans" onPress={() => setPage('Plans')} /></View>
+                <View style={styles.sectionBlock}><Text style={styles.panelTitle}>Redeem a voucher</Text><Text style={styles.pageSubtitle}>Validation and redemption run only on the server in one locked database transaction.</Text><Text style={styles.fieldLabel}>Voucher code</Text><TextInput autoCapitalize="characters" autoCorrect={false} onChangeText={setVoucherCode} placeholder="EL-XXXX-XXXX" placeholderTextColor={colors.subtle} style={styles.textInput} value={voucherCode} /><Button label="Redeem voucher" icon={<TicketCheck color={colors.white} size={17} />} onPress={redeemVoucher} /></View>
+              </View>
+              <View style={styles.listPanel}>
+                <View style={styles.transactionHeader}><Text style={styles.panelTitle}>Transaction history</Text><Text style={styles.pageSubtitle}>Credits and purchases</Text></View>
+                {walletTransactions.map((transaction) => <View key={transaction.id} style={styles.transactionRow}><View style={[styles.transactionIcon, transaction.amountIQD < 0 && styles.transactionIconDebit]}>{transaction.amountIQD < 0 ? <CreditCard color={colors.amber} size={18} /> : <Plus color={colors.green} size={18} />}</View><View style={styles.notificationCopy}><Text style={styles.studentDeviceName}>{transaction.title}</Text><Text style={styles.studentDeviceMeta}>{transaction.kind.replaceAll('_', ' ')} · {transaction.createdAt}</Text></View><Text style={[styles.transactionAmount, transaction.amountIQD < 0 && styles.transactionAmountDebit]}>{transaction.amountIQD > 0 ? '+' : ''}{formatIQD(transaction.amountIQD)}</Text></View>)}
+              </View>
+            </View>
+          )}
+
+          {page === 'Guardian' && currentUser.role === 'parent' && (
+            <View style={styles.pageStack}>
+              <View style={styles.pageHeader}><View><Text style={styles.overline}>GUARDIAN OVERVIEW</Text><Text style={styles.pageTitle}>Learning supervision</Text><Text style={styles.pageSubtitle}>Progress across every student linked to your guardian account.</Text></View><Pill label={`${guardianStudents.length} linked students`} tone="success" /></View>
+              <View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<HeartHandshake color={colors.green} size={20} />} label="On track" value="1 student" note="Meeting weekly target" /><Metric icon={<CircleAlert color={colors.amber} size={20} />} label="Needs attention" value="1 student" note="Missed learning target" /><Metric icon={<Clock3 color={colors.blue} size={20} />} label="Study time" value="18h 45m" note="This month" /><Metric icon={<GraduationCap color={colors.green} size={20} />} label="Lessons done" value="29" note="Across all courses" /></View>
+              <View style={styles.actionRow}><Pill label="On Track" tone="success" /><Pill label="Behind" tone="warning" /><Pill label="Inactive" tone="danger" /><Pill label="Excellent Progress" tone="success" /></View>
+              {guardianStudents.map((student) => <View key={student.id} style={styles.guardianCard}><View style={styles.guardianHeader}><View style={styles.profileSectionTitle}><View style={styles.teacherAvatar}><Text style={styles.avatarText}>{student.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View><View><Text style={styles.courseCardTitle}>{student.name}</Text><Text style={styles.courseCardInstructor}>{student.relationship}</Text></View></View><Pill label={student.status} tone={student.status === 'Behind' ? 'warning' : 'success'} /></View><View style={[styles.guardianMetrics, compact && styles.courseLayoutCompact]}><Detail label="Enrolled courses" value={String(student.enrolledCourses)} /><Detail label="Completed lessons" value={String(student.completedLessons)} /><Detail label="Quiz average" value={`${student.quizAverage}%`} /><Detail label="Study time" value={student.studyTime} /></View><View><View style={styles.progressHeader}><Text style={styles.progressLabel}>Current lesson · {student.currentLesson}</Text><Text style={styles.progressValue}>{student.watchedPercent}% watched</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${student.watchedPercent}%` }]} /></View></View><View style={styles.guardianFooter}><Text style={styles.courseCardDescription}>Target: {student.target}</Text><Text style={styles.studentDeviceMeta}>Last active: {student.lastActive}</Text></View></View>)}
             </View>
           )}
 
@@ -1277,9 +1454,8 @@ export default function PrototypeApp() {
                   </View>
                 </View>
               )}
-              <View style={styles.profileActions}>
-                <Button label="Switch user" tone="secondary" icon={<LogOut color={colors.greenDark} size={17} />} onPress={switchUser} />
-              </View>
+              <View style={styles.profileDetailsCard}><View style={styles.profileSectionTitle}><Building2 color={colors.blue} size={20} /><View><Text style={styles.panelTitle}>Appearance</Text><Text style={styles.pageSubtitle}>Choose light, dark, or follow this device.</Text></View></View><ThemePreferenceSelector preference={preference} onChange={setPreference} /></View>
+              {!desktopWeb && <View style={styles.profileActions}><Button label="Sign out" tone="secondary" icon={<LogOut color={colors.greenDark} size={17} />} onPress={switchUser} /></View>}
             </View>
           )}
 
@@ -1351,9 +1527,13 @@ export default function PrototypeApp() {
                   <Button label="Reset all demo data" tone="danger" onPress={resetDemo} />
                 </View>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.segmented}>{(['Overview', 'Content', 'Plans', 'Payments', 'Coupons', 'Sessions', 'Risk events', 'Devices', 'Notifications', 'Audit logs'] as AdminView[]).map((item) => <Pressable key={item} style={[styles.segment, adminView === item && styles.segmentActive]} onPress={() => setAdminView(item)}><Text style={[styles.segmentText, adminView === item && styles.segmentTextActive]}>{item}</Text></Pressable>)}</View></ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.segmented}>{(['Overview', 'Revenue', 'Users', 'Vouchers', 'Content', 'Plans', 'Payments', 'Sessions', 'Risk events', 'Devices', 'Notifications', 'Audit logs'] as AdminView[]).map((item) => <Pressable key={item} style={[styles.segment, adminView === item && styles.segmentActive]} onPress={() => setAdminView(item)}><Text style={[styles.segmentText, adminView === item && styles.segmentTextActive]}>{item}</Text></Pressable>)}</View></ScrollView>
 
               {adminView === 'Overview' && <><View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<Users color={colors.green} size={20} />} label="Students" value="2,416" note="128 active today" /><Metric icon={<CreditCard color={colors.blue} size={20} />} label="Pending payments" value={String(payments.filter((item) => item.status === 'Pending').length)} note="Needs review" /><Metric icon={<PlayCircle color={colors.amber} size={20} />} label="Active streams" value={String(Object.keys(state.locks).length)} note="Protected sessions" /><Metric icon={<ShieldAlert color={colors.red} size={20} />} label="Risk events" value={String(state.playback_risk_events.length)} note="Review suspicious activity" /></View><View style={[styles.courseGrid, compact && styles.courseGridCompact]}><Pressable style={styles.quickAction} onPress={() => setAdminView('Content')}><Plus color={colors.green} size={22} /><Text style={styles.studentDeviceName}>Publish content</Text><Text style={styles.courseCardDescription}>Manage subjects, teachers, courses, chapters, lessons, and secure video IDs.</Text></Pressable><Pressable style={styles.quickAction} onPress={() => setAdminView('Payments')}><CreditCard color={colors.blue} size={22} /><Text style={styles.studentDeviceName}>Review payments</Text><Text style={styles.courseCardDescription}>Approve manual proofs, refund transactions, and activate enrollment.</Text></Pressable><Pressable style={styles.quickAction} onPress={() => setAdminView('Notifications')}><Bell color={colors.amber} size={22} /><Text style={styles.studentDeviceName}>Send broadcast</Text><Text style={styles.courseCardDescription}>Queue push and email announcements for students.</Text></Pressable></View></>}
+
+              {adminView === 'Revenue' && <View style={styles.pageStack}><View style={styles.pageHeader}><View><Text style={styles.panelTitle}>Revenue and accounting</Text><Text style={styles.pageSubtitle}>Completed income, refunds, wallet-funded purchases, and outstanding wallet liability.</Text></View><Button label="Export CSV" tone="secondary" icon={<Download color={colors.greenDark} size={16} />} onPress={() => setNotice('Filtered accounting CSV exported.')} /></View><View style={styles.actionRow}>{(['Today', 'This week', 'This month'] as const).map((range) => <Pressable key={range} onPress={() => setRevenueRange(range)} style={[styles.filterChip, revenueRange === range && styles.filterChipActive]}><Text style={[styles.filterChipText, revenueRange === range && styles.filterChipTextActive]}>{range}</Text></Pressable>)}<Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Custom range</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Course · All</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Teacher · All</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Plan · All</Text></Pressable></View><View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<DollarSign color={colors.green} size={20} />} label="Total revenue" value="447,000 IQD" note={revenueRange} /><Metric icon={<WalletCards color={colors.blue} size={20} />} label="Voucher-funded" value="89,000 IQD" note="20% of gross sales" /><Metric icon={<Building2 color={colors.amber} size={20} />} label="Wallet liability" value="18.4M IQD" note="Unspent student balances" /><Metric icon={<CreditCard color={colors.green} size={20} />} label="Purchases" value="3" note="2 active subscriptions" /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['Date', 'Course / plan', 'Teacher', 'Funding source', 'Amount', 'Status']} />{revenueRows.map((row, index) => <TableRow key={`${row.date}-${index}`} cells={[row.date, row.source, row.teacher, row.method, row.amount, row.status]} />)}</View></ScrollView></View>}
+
+              {adminView === 'Users' && <View style={styles.pageStack}><View style={styles.searchBox}><Search color={colors.muted} size={18} /><TextInput onChangeText={setUserSearch} placeholder="Search by name, email, or user ID" placeholderTextColor={colors.subtle} style={styles.searchInput} value={userSearch} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['User', 'Email', 'Role', 'Wallet', 'Courses', 'Subscription']} />{filteredAdminUsers.map((user) => <Pressable key={user.id} onPress={() => setSelectedAdminUserId(user.id)}><TableRow cells={[`${user.name}\n${user.id}`, user.email, user.role, user.wallet, user.courses, user.subscription]} /></Pressable>)}</View></ScrollView>{selectedAdminUser && <View style={styles.profileDetailsCard}><View style={styles.pageHeader}><View><Text style={styles.panelEyebrow}>SELECTED USER</Text><Text style={styles.panelTitle}>{selectedAdminUser.name}</Text><Text style={styles.pageSubtitle}>{selectedAdminUser.email} · {selectedAdminUser.role}</Text></View><View style={styles.actionRow}><Button label="View profile" tone="secondary" onPress={() => setNotice(`Opened the admin profile for ${selectedAdminUser.name}.`)} /><Button label="Send password reset" icon={<KeyRound color={colors.white} size={16} />} onPress={() => setNotice(`Secure password reset email sent to ${selectedAdminUser.email}.`)} /></View></View><View style={styles.detailList}><Detail label="Wallet balance" value={selectedAdminUser.wallet} /><Detail label="Enrolled / purchased courses" value={selectedAdminUser.courses} /><Detail label="Subscription" value={selectedAdminUser.subscription} /></View></View>}<View style={styles.adminFooter}><ShieldCheck color={colors.blue} size={18} /><Text style={styles.adminFooterText}>Password reset sends the provider-managed recovery flow; admins never see or set a user’s raw password.</Text></View></View>}
 
               {adminView === 'Content' && <View style={styles.pageStack}><View style={styles.actionRow}><Button label="Add subject" tone="secondary" icon={<Plus color={colors.greenDark} size={16} />} onPress={() => setNotice('New subject draft created.')} /><Button label="Add course" icon={<Plus color={colors.white} size={16} />} onPress={() => setNotice('New course draft created. Add chapters and lessons before publishing.')} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['Subject', 'Teacher', 'Course', 'Lessons', 'Status']} />{contentRows.map((row) => <TableRow key={row.course} cells={[row.subject, row.teacher, row.course, row.lessons, row.status]} />)}</View></ScrollView><View style={styles.adminFooter}><Upload color={colors.blue} size={18} /><Text style={styles.adminFooterText}>Lesson publishing accepts a DRM provider video ID plus PDFs and thumbnails from private Storage buckets.</Text></View></View>}
 
@@ -1364,13 +1544,13 @@ export default function PrototypeApp() {
                 </View>
                 <View style={[styles.planGrid, compact && styles.planGridCompact]}>
                   {pricingPlans.map((plan) => (
-                    <View key={plan.id} style={styles.adminPlanCard}>
+                    <GlassSurface glassStyle={styles.nativeGlassClear} key={plan.id} style={styles.adminPlanCard} tintColor="rgba(255,255,255,0.52)">
                       <View style={styles.courseCardTop}><Text style={styles.planName}>{plan.tierName}</Text><Text style={styles.planChoicePrice}>{formatIQD(plan.retailPriceIQD)}</Text></View>
                       <Text style={styles.planUnlocks}>{plan.unlocks}</Text>
                       <View style={styles.detailList}>
                         {Object.entries(plan.payoutStructure).map(([key, amount]) => <Detail key={key} label={payoutLabel(key)} value={formatIQD(amount)} />)}
                       </View>
-                    </View>
+                    </GlassSurface>
                   ))}
                 </View>
                 <View style={styles.planRuleBanner}><ShieldCheck color={colors.green} size={18} /><Text style={styles.noticeText}>Custom multi-teacher mix: {pricingSystemConstraints.allowCustomMultiTeacherMix ? 'Allowed' : 'Disabled'} · Minimum bundle teacher payout: {formatIQD(pricingSystemConstraints.minimumBundleTeacherPayoutIQD)}</Text></View>
@@ -1378,7 +1558,7 @@ export default function PrototypeApp() {
 
               {adminView === 'Payments' && <View style={styles.listPanel}>{payments.map((payment) => <View key={payment.id} style={styles.paymentRow}><View style={styles.paymentIcon}><CreditCard color={colors.blue} size={20} /></View><View style={styles.notificationCopy}><View style={styles.userNameLine}><Text style={styles.studentDeviceName}>{payment.student}</Text><Pill label={payment.status} tone={payment.status === 'Pending' ? 'warning' : payment.status === 'Approved' ? 'success' : 'neutral'} /></View><Text style={styles.courseCardDescription}>{payment.course} · {payment.amount} · {payment.method}</Text><Text style={styles.studentDeviceMeta}>{payment.id}</Text></View><View style={styles.actionRow}>{payment.status === 'Pending' && <Button label="Approve" onPress={() => updatePayment(payment.id, 'Approved')} />}<Button label="Refund" tone="secondary" onPress={() => updatePayment(payment.id, 'Refunded')} /></View></View>)}</View>}
 
-              {adminView === 'Coupons' && <View style={styles.pageStack}><View style={styles.pageHeader}><Text style={styles.pageSubtitle}>Access codes can be course-specific, usage-limited, and time-limited.</Text><Button label="Create demo code" icon={<Plus color={colors.white} size={16} />} onPress={() => { setCoupons((current) => [{ code: `EXAM${current.length + 1}0`, course: 'Physics Exam Revision', uses: '0 / 25', expires: '31 Dec 2026', status: 'Active' }, ...current]); setNotice('New access code created.'); }} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['Code', 'Course', 'Uses', 'Expires', 'Status']} />{coupons.map((coupon) => <TableRow key={coupon.code} cells={[coupon.code, coupon.course, coupon.uses, coupon.expires, coupon.status]} />)}</View></ScrollView></View>}
+              {adminView === 'Vouchers' && <View style={styles.pageStack}><View style={styles.pageHeader}><Text style={styles.pageSubtitle}>Voucher codes are shown once at creation; production stores only their SHA-256 hashes.</Text><Button label="Generate secure voucher" icon={<Plus color={colors.white} size={16} />} onPress={() => { setCoupons((current) => [{ code: `EL-DEMO-${String(current.length + 1).padStart(4, '0')}`, course: 'Wallet credit · 89,000 IQD', uses: '0 / 1', expires: '31 Dec 2026', status: 'Unused' }, ...current]); setNotice('Voucher generated. Copy it now; the raw code is never stored.'); }} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['One-time code', 'Value', 'Redemptions', 'Expires', 'Status']} />{coupons.map((coupon) => <TableRow key={coupon.code} cells={[coupon.code, coupon.course, coupon.uses, coupon.expires, coupon.status]} />)}</View></ScrollView></View>}
 
               {(adminView === 'Sessions' || adminView === 'Risk events' || adminView === 'Audit logs') && <ScrollView horizontal showsHorizontalScrollIndicator><View style={styles.table}>
                   {adminView === 'Sessions' && (
@@ -1410,32 +1590,30 @@ export default function PrototypeApp() {
           </View>
         </ScrollView>
       </View>
-      {!desktopWeb && (
-        <View style={[styles.bottomNavDock, isIOS && styles.bottomNavDockIOS]}>
-          <View style={[styles.bottomNavSurface, Platform.OS === 'android' && styles.bottomNavAndroid, isIOS && styles.bottomNavIOSFallback]}>
-            {navigation}
-          </View>
-        </View>
-      )}
+      </NativeTabShell>
     </SafeAreaView>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
+  const { styles } = usePrototypeTheme();
   return <View style={styles.detailRow}><Text style={styles.detailLabel}>{label}</Text><Text numberOfLines={1} style={styles.detailValue}>{value}</Text></View>;
 }
 
 function CourseCategoryIcon({ category, size = 22 }: { category: StudentCourse['category']; size?: number }) {
+  const { colors } = usePrototypeTheme();
   if (category === 'Mathematics') return <BarChart3 color={colors.blue} size={size} />;
   if (category === 'Chemistry') return <Database color={colors.amber} size={size} />;
   return <Zap color={colors.green} size={size} />;
 }
 
-function navigationIcon(page: Page, active: boolean) {
+function navigationIcon(page: Page, active: boolean, colors: typeof lightColors) {
   const color = active ? colors.greenDark : colors.muted;
   if (page === 'Discover') return <BookOpen color={color} size={20} />;
   if (page === 'Courses') return <GraduationCap color={color} size={20} />;
   if (page === 'Plans') return <TicketCheck color={color} size={20} />;
+  if (page === 'Wallet') return <WalletCards color={color} size={20} />;
+  if (page === 'Guardian') return <HeartHandshake color={color} size={20} />;
   if (page === 'Notifications') return <Bell color={color} size={20} />;
   if (page === 'Teacher') return <BarChart3 color={color} size={20} />;
   if (page === 'Admin') return <ShieldCheck color={color} size={20} />;
@@ -1443,25 +1621,47 @@ function navigationIcon(page: Page, active: boolean) {
   return <UserRound color={color} size={20} />;
 }
 
+function navigationSymbol(page: Page): AppleIcon['sfSymbol'] {
+  if (page === 'Discover') return 'safari';
+  if (page === 'Courses') return 'graduationcap';
+  if (page === 'Plans') return 'ticket';
+  if (page === 'Wallet') return 'wallet.bifold';
+  if (page === 'Guardian') return 'person.2';
+  if (page === 'Notifications') return 'bell';
+  if (page === 'Teacher') return 'chart.bar';
+  if (page === 'Admin') return 'shield';
+  if (page === 'Status') return 'waveform.path.ecg';
+  return 'person.crop.circle';
+}
+
 function KeyRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  const { styles } = usePrototypeTheme();
   return <View style={styles.keyRow}><View style={styles.keyIcon}>{icon}</View><Text numberOfLines={1} style={styles.keyLabel}>{label}</Text><Text style={styles.keyValue}>{value}</Text></View>;
 }
 
 function TableRow({ cells, header = false }: { cells: string[]; header?: boolean }) {
+  const { styles } = usePrototypeTheme();
   return <View style={[styles.tableRow, header && styles.tableHeader]}>{cells.map((cell, index) => <Text key={`${cell}-${index}`} numberOfLines={2} style={[styles.tableCell, header && styles.tableHeaderText]}>{cell}</Text>)}</View>;
 }
 
 function EmptyTable({ label }: { label: string }) {
+  const { styles } = usePrototypeTheme();
   return <View style={styles.emptyTable}><Text style={styles.emptyTableText}>{label}</Text></View>;
+}
+
+function ThemePreferenceSelector({ preference, onChange }: { preference: ThemePreference; onChange: (preference: ThemePreference) => void }) {
+  const { styles } = usePrototypeTheme();
+  return <View style={styles.themeOptions}>{(['light', 'dark', 'system'] as const).map((option) => <Pressable accessibilityRole="radio" accessibilityState={{ checked: preference === option }} key={option} onPress={() => onChange(option)} style={[styles.themeOption, preference === option && styles.themeOptionActive]}><Text style={[styles.themeOptionText, preference === option && styles.themeOptionTextActive]}>{option === 'system' ? 'System default' : `${option[0].toUpperCase()}${option.slice(1)} mode`}</Text>{preference === option && <Check color="#ffffff" size={16} />}</Pressable>)}</View>;
 }
 
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: typeof lightColors) {
+return StyleSheet.create({
   screen: { backgroundColor: colors.canvas, flex: 1 },
-  webScreen: { backgroundColor: '#eef2f0' },
+  webScreen: { backgroundColor: colors.mode === 'dark' ? '#0a0f0d' : '#eef2f0' },
   appBody: { flex: 1 },
   webAppBody: { alignItems: 'stretch', flexDirection: 'row' },
   backToLanding: { alignSelf: 'center', marginBottom: 16, paddingHorizontal: 12, paddingVertical: 8 },
@@ -1490,11 +1690,11 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 120, textAlignVertical: 'top' },
   helperText: { color: colors.muted, fontSize: 10, marginBottom: 14, marginTop: 6 },
   loginFootnote: { color: colors.muted, fontSize: 11, marginTop: 16, textAlign: 'center' },
-  topbar: { alignItems: 'center', backgroundColor: isIOS ? 'rgba(249,249,249,0.94)' : colors.white, borderBottomColor: colors.border, borderBottomWidth: isIOS ? StyleSheet.hairlineWidth : 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: isIOS ? 52 : 68, paddingHorizontal: isIOS ? 16 : 24 },
+  topbar: { alignItems: 'center', backgroundColor: isIOS ? (colors.mode === 'dark' ? 'rgba(17,24,21,0.96)' : 'rgba(249,249,249,0.94)') : colors.white, borderBottomColor: colors.border, borderBottomWidth: isIOS ? StyleSheet.hairlineWidth : 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: isIOS ? 52 : 68, paddingHorizontal: isIOS ? 16 : 24 },
   webTopbar: { minHeight: 76, paddingHorizontal: 28 },
   webBrand: { alignItems: 'center', flexDirection: 'row', gap: 11 },
   profileTrigger: { alignItems: 'center', borderRadius: 22, flexDirection: 'row', gap: 10, maxWidth: '55%', paddingHorizontal: 4, paddingVertical: 4 },
-  webProfileTrigger: { backgroundColor: '#f7f9f8', borderColor: colors.border, borderRadius: 12, borderWidth: 1, maxWidth: 290, paddingHorizontal: 10, paddingVertical: 7 },
+  webProfileTrigger: { backgroundColor: colors.mode === 'dark' ? '#1b2723' : '#f7f9f8', borderColor: colors.border, borderRadius: 12, borderWidth: 1, maxWidth: 290, paddingHorizontal: 10, paddingVertical: 7 },
   profileTriggerCopy: { flexShrink: 1, minWidth: 0 },
   profileTriggerName: { color: colors.ink, fontSize: isIOS ? 17 : 14, fontWeight: isIOS ? '600' : '800' },
   profileTriggerHint: { color: colors.muted, fontSize: 10, marginTop: 2 },
@@ -1507,26 +1707,9 @@ const styles = StyleSheet.create({
   deviceLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   avatar: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 19, height: isIOS ? 36 : 38, justifyContent: 'center', width: isIOS ? 36 : 38 },
   avatarText: { color: colors.white, fontSize: 12, fontWeight: '800' },
-  bottomNavDock: { alignItems: 'center', paddingHorizontal: 12, paddingVertical: 0 },
-  bottomNavDockIOS: { paddingBottom: 4, paddingHorizontal: 12, paddingTop: 8 },
-  bottomNavSurface: { backgroundColor: 'rgba(255,255,255,0.96)', borderColor: colors.border, borderRadius: Platform.OS === 'web' ? 24 : 0, borderTopWidth: 1, maxWidth: Platform.OS === 'web' ? 720 : undefined, overflow: 'hidden', width: '100%' },
-  bottomNavAndroid: { backgroundColor: '#f7faf8', borderRadius: 0, elevation: 8 },
-  bottomNavIOSFallback: { backgroundColor: 'rgba(255,255,255,0.98)', borderColor: '#d9d9de', borderRadius: 20, borderTopWidth: 0, borderWidth: StyleSheet.hairlineWidth, maxWidth: 720, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.11, shadowRadius: 18 },
-  bottomNavItems: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-around', minHeight: 64, paddingHorizontal: 5, paddingVertical: 5 },
-  bottomNavItemsIOS: { minHeight: 66, paddingHorizontal: 6, paddingVertical: 6 },
-  bottomNavItem: { alignItems: 'center', flex: 1, gap: 2, justifyContent: 'center', minHeight: 54, minWidth: 54, paddingHorizontal: 3 },
-  bottomNavItemIOS: { gap: 3, minHeight: 54, minWidth: 60, paddingHorizontal: 2 },
-  bottomNavPressed: { transform: [{ scale: 0.97 }] },
-  bottomNavIcon: { alignItems: 'center', borderRadius: 18, height: 32, justifyContent: 'center', width: 52 },
-  bottomNavIconIOS: { borderRadius: 13, height: 30, width: 46 },
-  bottomNavIconActive: { backgroundColor: colors.greenSoft },
-  bottomNavIconActiveIOS: { backgroundColor: '#e8f2ff' },
-  bottomNavLabel: { color: colors.muted, fontSize: isIOS ? 10 : 9, fontWeight: isIOS ? '500' : '700' },
-  bottomNavLabelIOS: { fontSize: 10, letterSpacing: -0.05 },
-  bottomNavLabelActive: { color: colors.greenDark, fontWeight: isIOS ? '600' : '800' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
-  webMainScroll: { backgroundColor: '#eef2f0' },
+  webMainScroll: { backgroundColor: colors.mode === 'dark' ? '#0a0f0d' : '#eef2f0' },
   webScrollContent: { paddingBottom: 40 },
   webSidebar: { backgroundColor: '#15231e', borderRightColor: '#273b34', borderRightWidth: 1, paddingHorizontal: 16, paddingVertical: 24, width: 248 },
   webSidebarEyebrow: { color: '#82978f', fontSize: 9, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 12 },
@@ -1541,8 +1724,32 @@ const styles = StyleSheet.create({
   webSidebarFooterCopy: { flex: 1 },
   webSidebarFooterTitle: { color: colors.white, fontSize: 11, fontWeight: '800' },
   webSidebarFooterText: { color: '#90a49d', fontSize: 9, lineHeight: 13, marginTop: 2 },
+  sidebarSignOut: { alignItems: 'center', backgroundColor: '#321f1d', borderColor: '#5b302c', borderRadius: 9, borderWidth: 1, bottom: 96, flexDirection: 'row', gap: 10, left: 16, minHeight: 44, paddingHorizontal: 13, position: 'absolute', right: 16 },
+  sidebarSignOutText: { color: '#f5b4ae', fontSize: 12, fontWeight: '800' },
   content: { alignSelf: 'center', maxWidth: 1200, paddingHorizontal: isIOS ? 16 : 24, paddingTop: isIOS ? 14 : 20, width: '100%' },
   webContent: { alignSelf: 'stretch', maxWidth: 1440, paddingHorizontal: 32, paddingTop: 30 },
+  discoverStack: { gap: 0 },
+  discoverHero: { backgroundColor: colors.mode === 'dark' ? '#13221d' : '#edf4f0', marginHorizontal: isIOS ? -16 : -24, marginTop: isIOS ? -14 : -20, paddingBottom: 24, paddingHorizontal: isIOS ? 16 : 24, paddingTop: 24 },
+  webDiscoverHero: { borderRadius: 12, marginHorizontal: 0, marginTop: 0, paddingHorizontal: 28 },
+  discoverCatalogPill: { alignSelf: 'flex-start', marginTop: 16 },
+  discoverSubjectSection: { backgroundColor: colors.white, marginHorizontal: isIOS ? -16 : -24, paddingHorizontal: isIOS ? 16 : 24, paddingVertical: 16 },
+  webDiscoverSubjectSection: { marginHorizontal: 0 },
+  discoverSubjectRow: { gap: 10, paddingRight: isIOS ? 16 : 24 },
+  discoverSubjectChip: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: 24, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 48, paddingHorizontal: 17 },
+  discoverSubjectChipSelected: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  discoverSubjectText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  discoverSection: { gap: 12, paddingTop: 22 },
+  discoverTeacherList: { backgroundColor: colors.white },
+  discoverTeacherRow: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 112, paddingHorizontal: 14, paddingVertical: 14 },
+  discoverTeacherRowSelected: { backgroundColor: colors.greenSoft, borderRadius: 9, minHeight: 140 },
+  discoverTeacherRowDivider: { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+  discoverTeacherAvatarCompact: { borderRadius: 20, height: 40, width: 40 },
+  discoverSelectedCheck: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 21, height: 42, justifyContent: 'center', width: 42 },
+  discoverCourseList: { gap: 10 },
+  discoverCourseRow: { alignItems: 'flex-start', backgroundColor: colors.white, borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 14, paddingHorizontal: 4, paddingTop: 16 },
+  discoverCourseIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: 10, height: 72, justifyContent: 'center', width: 72 },
+  discoverCourseCopy: { flex: 1, gap: 3, minWidth: 0 },
+  discoverCourseActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   pageStack: { gap: isIOS ? 20 : 22 },
   sectionBlock: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, gap: 14, padding: isIOS ? 16 : 18 },
   choiceRow: { gap: 10, paddingTop: 12 },
@@ -1584,6 +1791,19 @@ const styles = StyleSheet.create({
   pathChoiceTextSelected: { color: colors.white },
   adminPlanCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, minWidth: 280, padding: isIOS ? 16 : 18 },
   uploadBox: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 14 : 7, borderStyle: 'dashed', borderWidth: isIOS ? 0 : 1, gap: 5, marginVertical: 14, padding: 24 },
+  walletCheckout: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: 8, flexDirection: 'row', gap: 12, marginVertical: 16, padding: 14 },
+  walletHero: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 16 : 9, borderWidth: isIOS ? 0 : 1, flex: 1, gap: 12, padding: 22 },
+  walletBalance: { color: colors.ink, fontSize: 32, fontWeight: '900' },
+  transactionHeader: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', padding: 16 },
+  transactionRow: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, padding: 16 },
+  transactionIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  transactionIconDebit: { backgroundColor: colors.amberSoft },
+  transactionAmount: { color: colors.green, fontSize: 12, fontWeight: '900' },
+  transactionAmountDebit: { color: colors.amber },
+  guardianCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 16 : 9, borderWidth: isIOS ? 0 : 1, gap: 18, padding: 20 },
+  guardianHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  guardianMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  guardianFooter: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   noticeBar: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 12 : 6, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', gap: 9, marginBottom: 20, minHeight: isIOS ? 44 : 42, paddingHorizontal: 12 },
   noticeText: { color: '#244f7d', flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 18 },
   pageHeader: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between' },
@@ -1682,6 +1902,7 @@ const styles = StyleSheet.create({
   buttonSecondary: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1 },
   buttonDanger: { backgroundColor: colors.red },
   buttonWarning: { backgroundColor: colors.amber },
+  nativeGlassClear: { backgroundColor: 'transparent', borderColor: 'transparent' },
   buttonText: { fontSize: isIOS ? 15 : 12, fontWeight: isIOS ? '600' : '800' },
   buttonTextLight: { color: colors.white },
   buttonTextSecondary: { color: colors.greenDark },
@@ -1716,6 +1937,11 @@ const styles = StyleSheet.create({
   profileSupportHeader: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
   profileSupportFooter: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
   profileActions: { alignItems: 'flex-end' },
+  themeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 },
+  themeOption: { alignItems: 'center', backgroundColor: colors.canvas, borderColor: colors.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 42, paddingHorizontal: 14 },
+  themeOptionActive: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  themeOptionText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  themeOptionTextActive: { color: '#ffffff' },
   studentStatusLayout: { alignItems: 'stretch', flexDirection: 'row', gap: 16 },
   studentSessionPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, padding: isIOS ? 16 : 18 },
   studentDevicePanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, padding: isIOS ? 16 : 18 },
@@ -1747,6 +1973,12 @@ const styles = StyleSheet.create({
   failureTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   failureText: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 3 },
   segmented: { alignSelf: 'flex-start', backgroundColor: isIOS ? '#e3e3e8' : '#e9eeeb', borderRadius: isIOS ? 9 : 7, flexDirection: 'row', padding: 3 },
+  filterChip: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8 },
+  filterChipActive: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  filterChipText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
+  filterChipTextActive: { color: '#ffffff' },
+  searchBox: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: 9, borderWidth: 1, flexDirection: 'row', gap: 9, paddingHorizontal: 14 },
+  searchInput: { color: colors.ink, flex: 1, fontSize: 13, minHeight: 46 },
   segment: { borderRadius: isIOS ? 7 : 5, justifyContent: 'center', minHeight: isIOS ? 36 : 34, paddingHorizontal: 13 },
   segmentActive: { backgroundColor: colors.white },
   segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
@@ -1761,3 +1993,15 @@ const styles = StyleSheet.create({
   adminFooter: { alignItems: 'center', backgroundColor: colors.blueSoft, borderRadius: isIOS ? 12 : 6, flexDirection: 'row', gap: 9, padding: 12 },
   adminFooterText: { color: '#244f7d', flex: 1, fontSize: 11, lineHeight: 17 },
 });
+}
+
+export default function PrototypeApp() {
+  const theme = useThemePreference();
+  const colors = theme.resolvedTheme === 'dark' ? darkColors : lightColors;
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const value = useMemo<PrototypeThemeContextValue>(
+    () => ({ ...theme, colors, styles }),
+    [colors, styles, theme.preference, theme.resolvedTheme],
+  );
+  return <PrototypeThemeContext.Provider value={value}><PrototypeExperience /></PrototypeThemeContext.Provider>;
+}

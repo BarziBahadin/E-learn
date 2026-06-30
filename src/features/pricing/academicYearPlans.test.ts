@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   payoutTotal,
+  pricingPlanById,
   pricingPlans,
   pricingSystemConstraints,
   subjectsForPlan,
 } from './academicYearPlans';
+
+it('uses Biology instead of Mathematics in Gold', () => {
+  expect(subjectsForPlan(pricingPlanById('gold'))).toEqual(['Biology', 'Physics', 'Chemistry']);
+});
 
 describe('academic-year pricing plans', () => {
   it('balances every payout structure to its retail price', () => {

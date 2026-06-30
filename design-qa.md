@@ -1,37 +1,37 @@
 # Design QA
 
-- Source visual truth: user-provided iOS screenshot, mirrored at `/tmp/e-lern-ios-2.png`
-- Implementation screenshot: `/tmp/e-lern-teacher-text-fixed.png`
-- Viewport: iPhone 17 simulator, 1206 × 2622 pixels, light mode
+- Source visual truth: `/Users/barzy/.codex/generated_images/019f18ae-c558-7220-b211-c0068058e986/exec-16ad200b-99ae-4139-947b-f082d9a9a8a7.png`
+- Implementation screenshot: unavailable
+- Viewport: target Android mobile viewport, 390 × 844 logical pixels
 - State: Student Discover screen, Physics selected, Ahmed Hassan selected
-- Full-view comparison evidence: both captures show the same screen and selected-teacher state; the implementation capture is at a slightly higher scroll position.
-- Focused comparison evidence: `/tmp/e-lern-teacher-source-crop.png` and `/tmp/e-lern-teacher-fixed-crop.png` compare the selected Ahmed Hassan card at equal crop dimensions.
+- Full-view comparison evidence: blocked because the in-app browser is unavailable and no Android emulator is connected.
+- Focused region comparison evidence: blocked for the same reason.
 
 ## Findings
 
-No actionable P0, P1, or P2 differences remain. The `Physics` subject label now has its own positive top spacing and line height, so it sits below the teacher name instead of overlapping it.
-
-Required fidelity surfaces checked:
-
-- Fonts and typography: existing font family, weights, and sizes are preserved; name and subject baselines no longer collide.
-- Spacing and layout rhythm: the subject label has a 1-point top margin and 15-point line height; the rest of the card layout is unchanged.
-- Colors and visual tokens: existing blue, gray, and selected-card colors are unchanged.
-- Image quality and asset fidelity: no image assets were changed.
-- Copy and content: teacher name, subject, biography, and statistics are unchanged.
+- [P1] Rendered implementation has not been visually compared with the selected mock.
+  - Location: Student Discover screen.
+  - Evidence: the source mock opens correctly, but no implementation capture is available.
+  - Impact: typography, wrapping, viewport density, and bottom-navigation clearance cannot be accepted from code inspection alone.
+  - Fix: capture the running implementation at 390 × 844, combine it with the source mock, and resolve visible P0/P1/P2 differences.
 
 ## Patches Made
 
-- Replaced the shared negative-margin instructor style on teacher cards with a dedicated `teacherSubject` style.
+- Replaced three bordered section containers with a tinted hero, subject chips, a flat teacher list, and compact course rows.
+- Preserved subject, teacher, preview, unlock, and navigation interactions.
+- Added explicit selected states and accessibility radio semantics.
 
 ## Implementation Checklist
 
-- [x] Remove the overlap between teacher name and subject.
-- [x] Preserve existing card content and interaction.
-- [x] Verify the selected card on the iOS simulator.
-- [x] Pass TypeScript and automated tests.
+- [x] TypeScript passes.
+- [x] Automated tests pass.
+- [x] Expo Doctor passes.
+- [ ] Capture the implementation at the target viewport.
+- [ ] Compare full screen and focused typography/layout regions.
+- [ ] Resolve remaining P0/P1/P2 findings.
 
 ## Follow-up Polish
 
-None required for this scoped fix.
+Pending visual comparison.
 
-final result: passed
+final result: blocked
