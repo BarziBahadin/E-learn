@@ -1,5 +1,4 @@
 import { useEvent } from 'expo';
-import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   Activity,
@@ -55,11 +54,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from '../i18n/Text';
+import { useI18n, type LanguagePreference } from '../i18n/I18nProvider';
 import {
   advanceDemoTime,
   createDemoState,
@@ -105,6 +105,7 @@ import {
   ACADEMIC_YEAR_ACCESS_MODEL,
   formatIQD,
   pathLabel,
+  privatePlanPriceIQD,
   payoutLabel,
   pricingPlanById,
   pricingPlans,
@@ -139,46 +140,47 @@ type ClientSession = {
 const VIDEO_SOURCE = require('../../assets/mixkit-hands-of-a-person-typing-on-a-cell-phone-4915-full-hd.mp4');
 
 const isIOS = Platform.OS === 'ios';
+const isWeb = Platform.OS === 'web';
 
 const lightColors = {
   mode: 'light' as 'light' | 'dark',
-  ink: isIOS ? '#1c1c1e' : '#17221f',
-  muted: isIOS ? '#6c6c70' : '#65736e',
-  subtle: isIOS ? '#8e8e93' : '#87938e',
-  border: isIOS ? '#c6c6c8' : '#dce3df',
-  canvas: isIOS ? '#f2f2f7' : '#f4f6f5',
-  white: '#ffffff',
-  green: isIOS ? '#007aff' : '#19714f',
-  greenDark: isIOS ? '#007aff' : '#10533a',
-  greenSoft: isIOS ? '#eaf3ff' : '#e8f4ee',
-  blue: isIOS ? '#007aff' : '#295f9b',
-  blueSoft: isIOS ? '#eaf3ff' : '#eaf1f8',
-  amber: isIOS ? '#ff9500' : '#9a5b13',
-  amberSoft: isIOS ? '#fff4e5' : '#fff3df',
-  red: isIOS ? '#ff3b30' : '#b23b35',
-  redSoft: isIOS ? '#ffebea' : '#fff0ef',
-  charcoal: isIOS ? '#000000' : '#111916',
+  ink: isIOS ? '#1c1c1e' : isWeb ? '#25313B' : '#17221f',
+  muted: isIOS ? '#6c6c70' : isWeb ? '#647785' : '#65736e',
+  subtle: isIOS ? '#8e8e93' : isWeb ? '#87949D' : '#87938e',
+  border: isIOS ? '#c6c6c8' : isWeb ? '#DCE7EC' : '#dce3df',
+  canvas: isIOS ? '#f2f2f7' : isWeb ? '#F5F7F8' : '#f4f6f5',
+  white: isWeb ? '#FFFFFF' : '#ffffff',
+  green: isIOS ? '#007aff' : isWeb ? '#4F7A66' : '#19714f',
+  greenDark: isIOS ? '#007aff' : isWeb ? '#355A49' : '#10533a',
+  greenSoft: isIOS ? '#eaf3ff' : isWeb ? '#E4EEE9' : '#e8f4ee',
+  blue: isIOS ? '#007aff' : isWeb ? '#416B83' : '#295f9b',
+  blueSoft: isIOS ? '#eaf3ff' : isWeb ? '#DCE7EC' : '#eaf1f8',
+  amber: isIOS ? '#ff9500' : isWeb ? '#A9782D' : '#9a5b13',
+  amberSoft: isIOS ? '#fff4e5' : isWeb ? '#F3E8CF' : '#fff3df',
+  red: isIOS ? '#ff3b30' : isWeb ? '#9A4F4F' : '#b23b35',
+  redSoft: isIOS ? '#ffebea' : isWeb ? '#F3E2E2' : '#fff0ef',
+  charcoal: isIOS ? '#000000' : isWeb ? '#25313B' : '#111916',
 };
 
 const darkColors: typeof lightColors = {
   ...lightColors,
   mode: 'dark',
-  ink: '#f2f7f4',
-  muted: '#a8b5b0',
-  subtle: '#84928d',
-  border: '#31413b',
-  canvas: '#0c1210',
-  white: '#17201d',
-  green: '#64c998',
-  greenDark: '#42a979',
-  greenSoft: '#1b352a',
-  blue: '#7ab8ff',
-  blueSoft: '#182c42',
-  amber: '#f0aa55',
-  amberSoft: '#382817',
-  red: '#ff8179',
-  redSoft: '#3e211f',
-  charcoal: '#050806',
+  ink: isWeb ? '#F5F7F8' : '#f2f7f4',
+  muted: isWeb ? '#B9C6CE' : '#a8b5b0',
+  subtle: isWeb ? '#91A2AD' : '#84928d',
+  border: isWeb ? '#416B83' : '#31413b',
+  canvas: isWeb ? '#18232C' : '#0c1210',
+  white: isWeb ? '#25313B' : '#17201d',
+  green: isWeb ? '#86AD98' : '#64c998',
+  greenDark: isWeb ? '#6E9A83' : '#42a979',
+  greenSoft: isWeb ? '#304D42' : '#1b352a',
+  blue: isWeb ? '#9BB8C8' : '#7ab8ff',
+  blueSoft: isWeb ? '#294656' : '#182c42',
+  amber: isWeb ? '#D4B56A' : '#f0aa55',
+  amberSoft: isWeb ? '#4B4028' : '#382817',
+  red: isWeb ? '#D88989' : '#ff8179',
+  redSoft: isWeb ? '#4A3033' : '#3e211f',
+  charcoal: isWeb ? '#101820' : '#050806',
 };
 
 type PrototypeThemeContextValue = {
@@ -273,6 +275,7 @@ function Metric({ icon, label, value, note }: { icon: React.ReactNode; label: st
 
 function PrototypeExperience() {
   const { colors, preference, resolvedTheme, setPreference, styles } = usePrototypeTheme();
+  const { language, preference: languagePreference, setPreference: setLanguagePreference, translate } = useI18n();
   const { width } = useWindowDimensions();
   const compact = width < 780;
   const [state, setState] = useState<DemoPlaybackState>(() => createDemoState());
@@ -302,6 +305,7 @@ function PrototypeExperience() {
   const [selectedPricingPlanId, setSelectedPricingPlanId] = useState<PricingPlanId>('bronze');
   const [selectedPricingPathIndex, setSelectedPricingPathIndex] = useState(0);
   const [pendingPricingPlanId, setPendingPricingPlanId] = useState<PricingPlanId | null>(null);
+  const [selectedPricingPlanType, setSelectedPricingPlanType] = useState<'standard' | 'private'>('standard');
   const [unlockMethod, setUnlockMethod] = useState<'Wallet' | 'Coupon' | 'Manual payment' | 'Online payment'>('Wallet');
   const [couponCode, setCouponCode] = useState('WELCOME12');
   const [notifications, setNotifications] = useState(initialNotifications);
@@ -346,7 +350,14 @@ function PrototypeExperience() {
     .slice(selectedLessonIndex + 1)
     .find((lesson) => lesson.available);
   const checkoutCourse = studentCourses.find((course) => course.id === checkoutCourseId) ?? studentCourses[0];
-  const selectedPricingPlan = pricingPlanById(selectedPricingPlanId);
+  const basePricingPlan = pricingPlanById(selectedPricingPlanId);
+  const selectedPricingPlan = selectedPricingPlanType === 'private'
+    ? {
+        ...basePricingPlan,
+        retailPriceIQD: privatePlanPriceIQD(basePricingPlan.retailPriceIQD),
+        tierName: `Private ${basePricingPlan.shortName}`,
+      }
+    : basePricingPlan;
   const filteredAdminUsers = useMemo(() => adminUsers.filter((user) =>
     `${user.name} ${user.email} ${user.id}`.toLowerCase().includes(userSearch.trim().toLowerCase()),
   ), [userSearch]);
@@ -589,6 +600,7 @@ function PrototypeExperience() {
     setSelectedPricingPlanId(planId);
     setSelectedPricingPathIndex(0);
     setPendingPricingPlanId(null);
+    setSelectedPricingPlanType('standard');
     setPage('Checkout');
     setNotice('Choose a plan, confirm its fixed subject path, then select an unlock method.');
   }, []);
@@ -737,6 +749,7 @@ function PrototypeExperience() {
     setSelectedPricingPlanId('bronze');
     setSelectedPricingPathIndex(0);
     setPendingPricingPlanId(null);
+    setSelectedPricingPlanType('standard');
     setHeartbeatsEnabled(true);
     setHeartbeatIn(HEARTBEAT_INTERVAL_SECONDS);
     setNotice('Register a device to begin the demo.');
@@ -763,13 +776,15 @@ function PrototypeExperience() {
 
   if (!currentUser || !currentDevice) {
     if (showLanding) {
-      return <LandingPage onStartDemo={(planId) => {
+      return <LandingPage onStartDemo={(planId, planType = 'standard') => {
         if (planId) {
           setSelectedPricingPlanId(planId);
           setSelectedPricingPathIndex(0);
           setPendingPricingPlanId(planId);
+          setSelectedPricingPlanType(planType);
         } else {
           setPendingPricingPlanId(null);
+          setSelectedPricingPlanType('standard');
         }
         setShowLanding(false);
       }} />;
@@ -777,7 +792,6 @@ function PrototypeExperience() {
 
     return (
       <SafeAreaView style={styles.screen}>
-        <StatusBar style="dark" />
         <View style={styles.loginShell}>
           <Pressable onPress={() => setShowLanding(true)} style={styles.backToLanding}>
             <Text style={styles.backToLandingText}>Back to website</Text>
@@ -816,7 +830,7 @@ function PrototypeExperience() {
             {authStep === 'otp' && (
               <View style={styles.otpPanel}>
                 <View><Text style={styles.registrationTitle}>Verify email or phone</Text><Text style={styles.registrationMeta}>Demo code: 123456</Text></View>
-                <TextInput accessibilityLabel="One-time password" keyboardType="number-pad" maxLength={6} onChangeText={setOtp} style={styles.textInput} value={otp} />
+                <TextInput accessibilityLabel={translate('One-time password')} keyboardType="number-pad" maxLength={6} onChangeText={setOtp} style={styles.textInput} value={otp} />
               </View>
             )}
             <View style={styles.registrationPreview}>
@@ -857,7 +871,9 @@ function PrototypeExperience() {
     icon: navigationIcon(item, isNavigationActive(item), colors),
     key: item,
     sfSymbol: navigationSymbol(item),
-    title: item,
+    title: language === 'ckb'
+      ? ({ Discover: 'دۆزینەوە', Guardian: 'چاودێر', Admin: 'بەڕێوەبەر' } as Partial<Record<Page, string>>)[item] ?? translate(item)
+      : item,
   }));
   const discoverSubjects = subjects.filter((subject) =>
     teachers.some((teacher) => teacher.subjectId === subject.id),
@@ -868,7 +884,7 @@ function PrototypeExperience() {
     (courseItem) => courseItem.category.toLowerCase() === selectedSubjectId,
   );
   const profileTrigger = (
-    <Pressable accessibilityLabel="Open profile" accessibilityRole="button" onPress={() => setPage('Profile')} style={({ pressed }) => [styles.profileTrigger, desktopWeb && styles.webProfileTrigger, pressed && styles.pressed]}>
+    <Pressable accessibilityLabel={translate('Open profile')} accessibilityRole="button" onPress={() => setPage('Profile')} style={({ pressed }) => [styles.profileTrigger, desktopWeb && styles.webProfileTrigger, pressed && styles.pressed]}>
       <View style={styles.avatar}><Text style={styles.avatarText}>{userInitials}</Text></View>
       <View style={styles.profileTriggerCopy}>
         <Text numberOfLines={1} style={styles.profileTriggerName}>{currentUser.name}</Text>
@@ -879,7 +895,6 @@ function PrototypeExperience() {
 
   return (
     <SafeAreaView style={[styles.screen, desktopWeb && styles.webScreen]}>
-      <StatusBar style="dark" />
       <View style={[styles.topbar, desktopWeb && styles.webTopbar]}>
         {desktopWeb ? (
           <View style={styles.webBrand}>
@@ -933,7 +948,7 @@ function PrototypeExperience() {
               </View>
             </View>
             <Pressable accessibilityRole="button" onPress={switchUser} style={({ pressed }) => [styles.sidebarSignOut, pressed && styles.pressed]}>
-              <LogOut color="#f5b4ae" size={18} />
+              <LogOut color={colors.muted} size={18} />
               <Text style={styles.sidebarSignOutText}>Sign out</Text>
             </Pressable>
           </View>
@@ -1412,7 +1427,7 @@ function PrototypeExperience() {
                     <Detail label="Email" value={currentUser.email} />
                     <Detail label="Account ID" value={currentUser.id} />
                     <Detail label="Role" value={`${currentUser.role[0]?.toUpperCase()}${currentUser.role.slice(1)}`} />
-                    <Detail label="Language" value="Kurdish / Arabic / English" />
+                    <Detail label="Language" value={language === 'ckb' ? 'کوردی' : 'English'} />
                   </View>
                 </View>
               </View>
@@ -1447,13 +1462,20 @@ function PrototypeExperience() {
                     <Pill label={`${ticketCount} submitted`} tone="neutral" />
                   </View>
                   <Text style={styles.fieldLabel}>How can we help?</Text>
-                  <TextInput multiline numberOfLines={4} onChangeText={setSupportMessage} placeholder="Describe the issue" placeholderTextColor={colors.subtle} style={[styles.textInput, styles.textArea]} value={supportMessage} />
+                  <TextInput multiline numberOfLines={4} onChangeText={setSupportMessage} placeholder={translate('Describe the issue')} placeholderTextColor={colors.subtle} style={[styles.textInput, styles.textArea]} value={supportMessage} />
                   <View style={styles.profileSupportFooter}>
                     <Text style={styles.helperText}>Typical response within 24 hours.</Text>
                     <Button label="Submit support ticket" icon={<Send color={colors.white} size={16} />} onPress={submitSupportTicket} />
                   </View>
                 </View>
               )}
+              <View style={styles.profileDetailsCard}>
+                <View style={styles.profileSectionTitle}>
+                  <BookOpen color={colors.green} size={20} />
+                  <View><Text style={styles.panelTitle}>Language</Text><Text style={styles.pageSubtitle}>Choose the app language or follow this device.</Text></View>
+                </View>
+                <LanguagePreferenceSelector preference={languagePreference} onChange={setLanguagePreference} />
+              </View>
               <View style={styles.profileDetailsCard}><View style={styles.profileSectionTitle}><Building2 color={colors.blue} size={20} /><View><Text style={styles.panelTitle}>Appearance</Text><Text style={styles.pageSubtitle}>Choose light, dark, or follow this device.</Text></View></View><ThemePreferenceSelector preference={preference} onChange={setPreference} /></View>
               {!desktopWeb && <View style={styles.profileActions}><Button label="Sign out" tone="secondary" icon={<LogOut color={colors.greenDark} size={17} />} onPress={switchUser} /></View>}
             </View>
@@ -1654,6 +1676,13 @@ function ThemePreferenceSelector({ preference, onChange }: { preference: ThemePr
   return <View style={styles.themeOptions}>{(['light', 'dark', 'system'] as const).map((option) => <Pressable accessibilityRole="radio" accessibilityState={{ checked: preference === option }} key={option} onPress={() => onChange(option)} style={[styles.themeOption, preference === option && styles.themeOptionActive]}><Text style={[styles.themeOptionText, preference === option && styles.themeOptionTextActive]}>{option === 'system' ? 'System default' : `${option[0].toUpperCase()}${option.slice(1)} mode`}</Text>{preference === option && <Check color="#ffffff" size={16} />}</Pressable>)}</View>;
 }
 
+function LanguagePreferenceSelector({ preference, onChange }: { preference: LanguagePreference; onChange: (preference: LanguagePreference) => Promise<void> }) {
+  const { styles } = usePrototypeTheme();
+  const { language } = useI18n();
+  const options: LanguagePreference[] = ['device', 'en', 'ckb'];
+  return <View style={styles.themeOptions}>{options.map((option) => <Pressable accessibilityRole="radio" accessibilityState={{ checked: preference === option }} key={option} onPress={() => void onChange(option)} style={[styles.themeOption, preference === option && styles.themeOptionActive]}><Text style={[styles.themeOptionText, preference === option && styles.themeOptionTextActive]}>{option === 'device' ? (language === 'ckb' ? 'زمانی ئامێر' : 'Device language') : option === 'en' ? 'English' : 'کوردی'}</Text>{preference === option && <Check color="#ffffff" size={16} />}</Pressable>)}</View>;
+}
+
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -1661,7 +1690,7 @@ function formatTime(value: string) {
 function createStyles(colors: typeof lightColors) {
 return StyleSheet.create({
   screen: { backgroundColor: colors.canvas, flex: 1 },
-  webScreen: { backgroundColor: colors.mode === 'dark' ? '#0a0f0d' : '#eef2f0' },
+  webScreen: { backgroundColor: colors.mode === 'dark' ? '#18232C' : '#F5F7F8' },
   appBody: { flex: 1 },
   webAppBody: { alignItems: 'stretch', flexDirection: 'row' },
   backToLanding: { alignSelf: 'center', marginBottom: 16, paddingHorizontal: 12, paddingVertical: 8 },
@@ -1694,7 +1723,7 @@ return StyleSheet.create({
   webTopbar: { minHeight: 76, paddingHorizontal: 28 },
   webBrand: { alignItems: 'center', flexDirection: 'row', gap: 11 },
   profileTrigger: { alignItems: 'center', borderRadius: 22, flexDirection: 'row', gap: 10, maxWidth: '55%', paddingHorizontal: 4, paddingVertical: 4 },
-  webProfileTrigger: { backgroundColor: colors.mode === 'dark' ? '#1b2723' : '#f7f9f8', borderColor: colors.border, borderRadius: 12, borderWidth: 1, maxWidth: 290, paddingHorizontal: 10, paddingVertical: 7 },
+  webProfileTrigger: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: 12, borderWidth: 1, maxWidth: 290, paddingHorizontal: 10, paddingVertical: 7 },
   profileTriggerCopy: { flexShrink: 1, minWidth: 0 },
   profileTriggerName: { color: colors.ink, fontSize: isIOS ? 17 : 14, fontWeight: isIOS ? '600' : '800' },
   profileTriggerHint: { color: colors.muted, fontSize: 10, marginTop: 2 },
@@ -1709,27 +1738,27 @@ return StyleSheet.create({
   avatarText: { color: colors.white, fontSize: 12, fontWeight: '800' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
-  webMainScroll: { backgroundColor: colors.mode === 'dark' ? '#0a0f0d' : '#eef2f0' },
+  webMainScroll: { backgroundColor: colors.mode === 'dark' ? '#18232C' : '#F5F7F8' },
   webScrollContent: { paddingBottom: 40 },
-  webSidebar: { backgroundColor: '#15231e', borderRightColor: '#273b34', borderRightWidth: 1, paddingHorizontal: 16, paddingVertical: 24, width: 248 },
-  webSidebarEyebrow: { color: '#82978f', fontSize: 9, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 12 },
+  webSidebar: { backgroundColor: '#1F3443', borderRightColor: '#416B83', borderRightWidth: 1, paddingHorizontal: 16, paddingVertical: 24, width: 248 },
+  webSidebarEyebrow: { color: '#9BB8C8', fontSize: 9, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 12 },
   webSidebarNavigation: { gap: 5, marginTop: 14 },
   webNavItem: { alignItems: 'center', borderRadius: 9, flexDirection: 'row', gap: 12, minHeight: 48, paddingHorizontal: 10 },
-  webNavItemActive: { backgroundColor: '#244338' },
+  webNavItemActive: { backgroundColor: '#416B83' },
   webNavIcon: { alignItems: 'center', borderRadius: 7, height: 32, justifyContent: 'center', width: 34 },
-  webNavIconActive: { backgroundColor: '#dff2e8' },
-  webNavLabel: { color: '#b8c6c1', fontSize: 13, fontWeight: '700' },
+  webNavIconActive: { backgroundColor: '#DCE7EC' },
+  webNavLabel: { color: '#DCE7EC', fontSize: 13, fontWeight: '700' },
   webNavLabelActive: { color: colors.white },
-  webSidebarFooter: { alignItems: 'center', backgroundColor: '#1c3029', borderColor: '#2c493f', borderRadius: 10, borderWidth: 1, bottom: 22, flexDirection: 'row', gap: 10, left: 16, padding: 12, position: 'absolute', right: 16 },
+  webSidebarFooter: { alignItems: 'center', backgroundColor: '#25313B', borderColor: '#416B83', borderRadius: 10, borderWidth: 1, bottom: 22, flexDirection: 'row', gap: 10, left: 16, padding: 12, position: 'absolute', right: 16 },
   webSidebarFooterCopy: { flex: 1 },
   webSidebarFooterTitle: { color: colors.white, fontSize: 11, fontWeight: '800' },
-  webSidebarFooterText: { color: '#90a49d', fontSize: 9, lineHeight: 13, marginTop: 2 },
-  sidebarSignOut: { alignItems: 'center', backgroundColor: '#321f1d', borderColor: '#5b302c', borderRadius: 9, borderWidth: 1, bottom: 96, flexDirection: 'row', gap: 10, left: 16, minHeight: 44, paddingHorizontal: 13, position: 'absolute', right: 16 },
-  sidebarSignOutText: { color: '#f5b4ae', fontSize: 12, fontWeight: '800' },
+  webSidebarFooterText: { color: '#9BB8C8', fontSize: 9, lineHeight: 13, marginTop: 2 },
+  sidebarSignOut: { alignItems: 'center', backgroundColor: '#25313B', borderColor: '#647785', borderRadius: 9, borderWidth: 1, bottom: 96, flexDirection: 'row', gap: 10, left: 16, minHeight: 44, paddingHorizontal: 13, position: 'absolute', right: 16 },
+  sidebarSignOutText: { color: '#F5F7F8', fontSize: 12, fontWeight: '800' },
   content: { alignSelf: 'center', maxWidth: 1200, paddingHorizontal: isIOS ? 16 : 24, paddingTop: isIOS ? 14 : 20, width: '100%' },
   webContent: { alignSelf: 'stretch', maxWidth: 1440, paddingHorizontal: 32, paddingTop: 30 },
   discoverStack: { gap: 0 },
-  discoverHero: { backgroundColor: colors.mode === 'dark' ? '#13221d' : '#edf4f0', marginHorizontal: isIOS ? -16 : -24, marginTop: isIOS ? -14 : -20, paddingBottom: 24, paddingHorizontal: isIOS ? 16 : 24, paddingTop: 24 },
+  discoverHero: { backgroundColor: colors.greenSoft, marginHorizontal: isIOS ? -16 : -24, marginTop: isIOS ? -14 : -20, paddingBottom: 24, paddingHorizontal: isIOS ? 16 : 24, paddingTop: 24 },
   webDiscoverHero: { borderRadius: 12, marginHorizontal: 0, marginTop: 0, paddingHorizontal: 28 },
   discoverCatalogPill: { alignSelf: 'flex-start', marginTop: 16 },
   discoverSubjectSection: { backgroundColor: colors.white, marginHorizontal: isIOS ? -16 : -24, paddingHorizontal: isIOS ? 16 : 24, paddingVertical: 16 },

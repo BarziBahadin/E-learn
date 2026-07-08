@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   payoutTotal,
+  privatePlanPriceIQD,
   pricingPlanById,
   pricingPlans,
   pricingSystemConstraints,
@@ -12,6 +13,34 @@ it('uses Biology instead of Mathematics in Gold', () => {
 });
 
 describe('academic-year pricing plans', () => {
+  it('prices private plans at least 75% higher and rounds up to 9,750', () => {
+    expect(pricingPlans.map((plan) => privatePlanPriceIQD(plan.retailPriceIQD))).toEqual([
+      179_750,
+      319_750,
+      459_750,
+      979_750,
+    ]);
+  });
+
+  it('applies the requested flat plan prices without changing subject order', () => {
+    expect(pricingPlans.map(({ retailPriceIQD }) => retailPriceIQD)).toEqual([
+      99_750,
+      179_750,
+      259_750,
+      559_750,
+    ]);
+
+    expect(subjectsForPlan(pricingPlanById('platinum'))).toEqual([
+      'Mathematics',
+      'Physics',
+      'Chemistry',
+      'Biology',
+      'English',
+      'Kurdish',
+      'Arabic',
+    ]);
+  });
+
   it('balances every payout structure to its retail price', () => {
     for (const plan of pricingPlans) {
       expect(payoutTotal(plan)).toBe(plan.retailPriceIQD);

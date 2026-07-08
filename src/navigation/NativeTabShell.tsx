@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { AppleIcon } from 'react-native-bottom-tabs';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { GlassSurface } from '../ui/GlassSurface';
+import { Text } from '../i18n/Text';
 
 export type NativeTabRoute = {
   icon: ReactNode;

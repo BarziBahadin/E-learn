@@ -40,7 +40,9 @@ The **Status** page can also take the demo Redis service offline. New playback t
 
 Protected playback includes a server-issued dynamic watermark. The player shows a masked verified phone number or server-managed username with a short session trace code and moves it to irregular positions every 5–9 seconds. The overlay is removed as soon as the playback lock expires or ends. Native fullscreen is disabled for protected video because a sibling overlay is not guaranteed to remain visible outside the app's player container.
 
-The website and student app share four one-time academic-year plans: Bronze (89,000 IQD), Silver (159,000 IQD), Gold (199,000 IQD), and Platinum VIP (690,000 IQD). Silver, Gold, and Platinum use fixed subject paths; custom multi-teacher bundles are disabled. Access remains valid through the August/September ministerial resits. The web admin Plans view shows the matching payout allocation for each tier.
+The website and student app share four one-time academic-year plans: Bronze (1 class, 99,750 IQD), Silver (2 classes, 179,750 IQD), Gold (3 classes, 259,750 IQD), and Platinum VIP (all 7 classes, 559,750 IQD). Silver, Gold, and Platinum use fixed subject paths; custom multi-teacher bundles are disabled. Access remains valid through the August/September ministerial resits. The web admin Plans view shows the matching payout allocation for each tier.
+
+The landing page also offers matching private-class plans rounded up after the 75% increase: 179,750 IQD, 319,750 IQD, 459,750 IQD, and 979,750 IQD. Selecting a private plan carries that price into checkout.
 
 ## Run checks
 

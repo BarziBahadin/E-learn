@@ -27,19 +27,19 @@ export const pricingPlans: readonly PricingPlan[] = [
     id: 'bronze',
     tierName: 'Bronze Code',
     shortName: 'Bronze',
-    retailPriceIQD: 89_000,
+    retailPriceIQD: 99_750,
     unlocks: 'Any 1 standalone subject',
     allowedPaths: [],
     payoutStructure: {
       premiumTeacherShare: 44_500,
-      platformMargin: 44_500,
+      platformMargin: 55_250,
     },
   },
   {
     id: 'silver',
     tierName: 'Silver Code',
     shortName: 'Silver',
-    retailPriceIQD: 159_000,
+    retailPriceIQD: 179_750,
     unlocks: 'Choose exactly one fixed dual-subject path',
     allowedPaths: [
       ['Mathematics', 'Physics'],
@@ -48,28 +48,28 @@ export const pricingPlans: readonly PricingPlan[] = [
     payoutStructure: {
       teacher1Share: 40_000,
       teacher2Share: 40_000,
-      platformMargin: 79_000,
+      platformMargin: 99_750,
     },
   },
   {
     id: 'gold',
     tierName: 'Gold Code',
     shortName: 'Gold',
-    retailPriceIQD: 199_000,
+    retailPriceIQD: 259_750,
     unlocks: 'Fixed core science trio',
     allowedPaths: [['Biology', 'Physics', 'Chemistry']],
     payoutStructure: {
       biologyTeacherShare: 40_000,
       physicsTeacherShare: 40_000,
       chemistryTeacherShare: 40_000,
-      platformMargin: 79_000,
+      platformMargin: 139_750,
     },
   },
   {
     id: 'platinum',
     tierName: 'Platinum VIP Code',
     shortName: 'Platinum VIP',
-    retailPriceIQD: 690_000,
+    retailPriceIQD: 559_750,
     unlocks: 'Full pass for all 7 scientific-stream subjects',
     allowedPaths: [[
       'Mathematics',
@@ -81,12 +81,12 @@ export const pricingPlans: readonly PricingPlan[] = [
       'Arabic',
     ]],
     payoutStructure: {
-      distributionCommissionMactaba: 69_000,
+      distributionCommissionMactaba: 49_000,
       mathematicsTeacherShare: 100_000,
       physicsTeacherShare: 100_000,
       chemistryTeacherShare: 100_000,
       highMarginFillersPool: 100_000,
-      platformNetProfit: 221_000,
+      platformNetProfit: 110_750,
     },
   },
 ] as const;
@@ -98,6 +98,11 @@ export const pricingSystemConstraints = {
 
 export function formatIQD(amount: number) {
   return `${amount.toLocaleString('en-US')} IQD`;
+}
+
+export function privatePlanPriceIQD(amount: number) {
+  const increasedPrice = amount * 1.75;
+  return Math.ceil((increasedPrice + 250) / 10_000) * 10_000 - 250;
 }
 
 export function pricingPlanById(id: PricingPlanId) {

@@ -30,26 +30,40 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from '../i18n/Text';
 import {
   ACADEMIC_YEAR_ACCESS_MODEL,
   formatIQD,
   pathLabel,
+  privatePlanPriceIQD,
   pricingPlans,
   type PricingPlanId,
 } from '../features/pricing/academicYearPlans';
 import { GlassSurface } from '../ui/GlassSurface';
 
 type LandingPageProps = {
-  onStartDemo: (planId?: PricingPlanId) => void;
+  onStartDemo: (planId?: PricingPlanId, planType?: 'standard' | 'private') => void;
 };
 
 type SectionKey = 'courses' | 'pricing' | 'teachers' | 'how' | 'parents';
 
-const palette = {
+const palette = Platform.OS === 'web' ? {
+  ink: '#25313B',
+  blue: '#416B83',
+  blueDark: '#25313B',
+  blueSoft: '#DCE7EC',
+  green: '#4F7A66',
+  greenSoft: '#E4EEE9',
+  sand: '#F3E8CF',
+  cream: '#F5F7F8',
+  paper: '#FFFFFF',
+  line: '#DCE7EC',
+  muted: '#647785',
+  white: '#FFFFFF',
+} : {
   ink: '#10233f',
   blue: '#0b5dcc',
   blueDark: '#073c85',
@@ -82,7 +96,7 @@ const subjects = [
   {
     id: 'Chemistry',
     icon: FlaskConical,
-    color: '#b27a24',
+    color: '#A9782D',
     copy: 'Understand reactions and key concepts, then practice until every step feels familiar.',
     detail: '38 video lessons · 9 quizzes',
   },
@@ -269,7 +283,7 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
             <View style={styles.heroProof}>
               <View style={styles.proofItem}><Users color={palette.blue} size={18} /><Text style={styles.proofText}>Trusted local teachers</Text></View>
               <View style={styles.proofItem}><Target color={palette.green} size={18} /><Text style={styles.proofText}>Built for Grade 12</Text></View>
-              <View style={styles.proofItem}><Laptop color="#a56d20" size={18} /><Text style={styles.proofText}>Learn on every device</Text></View>
+              <View style={styles.proofItem}><Laptop color={palette.green} size={18} /><Text style={styles.proofText}>Learn on every device</Text></View>
             </View>
           </View>
 
@@ -377,7 +391,7 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
                 <Text style={[styles.pricingFrequency, plan.id === 'platinum' && styles.pricingTextMutedLight]}>One-time purchase</Text>
                 <View style={styles.pricingDivider} />
                 <View style={styles.pricingBenefit}>
-                  <CheckCircle2 color={plan.id === 'platinum' ? '#9fc5f3' : palette.green} size={17} />
+                  <CheckCircle2 color={plan.id === 'platinum' ? palette.greenSoft : palette.green} size={17} />
                   <Text style={[styles.pricingUnlocks, plan.id === 'platinum' && styles.pricingTextLight]}>{plan.unlocks}</Text>
                 </View>
                 {plan.allowedPaths.length > 0 ? (
@@ -401,6 +415,51 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
           <View style={styles.pricingRuleRow}>
             <LockKeyhole color={palette.blue} size={17} />
             <Text style={styles.pricingRuleText}>Fixed bundle paths only. Custom multi-teacher mixes are not available.</Text>
+          </View>
+
+          <View style={[styles.sectionHeading, styles.privatePricingHeading]}>
+            <Text style={styles.sectionKicker}>ONE-TO-ONE SUPPORT · PRIVATE LEARNING</Text>
+            <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>
+              Private <Text style={styles.sectionTitleAccent}>classes.</Text>
+            </Text>
+            <Text style={styles.sectionIntro}>Choose the same study path with dedicated private instruction. Private plans are priced 75% above standard access.</Text>
+          </View>
+          <View style={[styles.pricingGrid, compact && styles.pricingGridCompact]}>
+            {pricingPlans.map((plan) => (
+              <GlassSurface
+                glassStyle={styles.nativeGlassClear}
+                key={`private-${plan.id}`}
+                style={[styles.pricingCard, styles.privatePricingCard]}
+                tintColor="rgba(255,255,255,0.62)"
+              >
+                <View style={styles.pricingCardHeader}>
+                  <Text style={styles.pricingTier}>PRIVATE {plan.shortName.toUpperCase()}</Text>
+                  <View style={[styles.pricingDot, styles.pricingDotPrivate]} />
+                </View>
+                <Text style={styles.pricingPrice}>{formatIQD(privatePlanPriceIQD(plan.retailPriceIQD))}</Text>
+                <Text style={styles.pricingFrequency}>One-time private plan</Text>
+                <View style={styles.pricingDivider} />
+                <View style={styles.pricingBenefit}>
+                  <CheckCircle2 color={palette.green} size={17} />
+                  <Text style={styles.pricingUnlocks}>{plan.unlocks}</Text>
+                </View>
+                {plan.allowedPaths.length > 0 ? (
+                  <View style={styles.pricingPaths}>
+                    {plan.allowedPaths.map((path) => (
+                      <View key={pathLabel(path)} style={styles.pricingPath}>
+                        <Text style={styles.pricingPathText}>{pathLabel(path)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.pricingPathHint}>Choose Mathematics, Physics, Chemistry, Biology, English, Kurdish, or Arabic.</Text>
+                )}
+                <Pressable onPress={() => compact ? scrollRef.current?.scrollToEnd({ animated: true }) : onStartDemo(plan.id, 'private')} style={[styles.pricingCta, styles.privatePricingCta]}>
+                  <Text style={styles.pricingCtaText}>Choose private {plan.shortName}</Text>
+                  <ArrowRight color={palette.white} size={15} />
+                </Pressable>
+              </GlassSurface>
+            ))}
           </View>
         </View>
 
@@ -607,17 +666,20 @@ const styles = StyleSheet.create({
   textLink: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 8, marginTop: 26, paddingVertical: 4 },
   textLinkLabel: { color: palette.blue, fontSize: 13, fontWeight: '800' },
   pricingSection: { maxWidth: 1360 },
+  privatePricingHeading: { marginTop: 72 },
   pricingGrid: { alignItems: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 48 },
   pricingGridCompact: { flexDirection: 'column' },
   pricingCard: { backgroundColor: palette.paper, borderColor: palette.line, borderRadius: 10, borderWidth: 1, flex: 1, minWidth: 250, padding: 24 },
+  privatePricingCard: { borderColor: Platform.OS === 'web' ? palette.line : '#b8cce5' },
   pricingCardPlatinum: { backgroundColor: palette.blueDark, borderColor: palette.blueDark },
   pricingCardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   pricingTier: { color: palette.ink, fontSize: 12, fontWeight: '900', letterSpacing: 0.55 },
   pricingDot: { borderRadius: 6, height: 12, width: 12 },
-  pricingDotBronze: { backgroundColor: '#a96735' },
-  pricingDotSilver: { backgroundColor: '#9aa4af' },
-  pricingDotGold: { backgroundColor: '#d49b19' },
-  pricingDotPlatinum: { backgroundColor: '#d9e8fa' },
+  pricingDotBronze: { backgroundColor: Platform.OS === 'web' ? palette.green : '#a96735' },
+  pricingDotSilver: { backgroundColor: Platform.OS === 'web' ? palette.muted : '#9aa4af' },
+  pricingDotGold: { backgroundColor: Platform.OS === 'web' ? '#A9782D' : '#d49b19' },
+  pricingDotPlatinum: { backgroundColor: Platform.OS === 'web' ? palette.greenSoft : '#d9e8fa' },
+  pricingDotPrivate: { backgroundColor: palette.blue },
   pricingPrice: { color: palette.ink, fontFamily: displayFont, fontSize: 29, fontWeight: '700', marginTop: 20 },
   pricingFrequency: { color: palette.muted, fontSize: 10, fontWeight: '700', marginTop: 4 },
   pricingDivider: { backgroundColor: 'rgba(180, 186, 194, 0.38)', height: 1, marginVertical: 20 },
@@ -629,8 +691,9 @@ const styles = StyleSheet.create({
   pricingPathText: { color: palette.blueDark, fontSize: 10, fontWeight: '800', lineHeight: 15 },
   pricingPathHint: { color: palette.muted, fontSize: 10, lineHeight: 16, marginTop: 15 },
   pricingTextLight: { color: palette.white },
-  pricingTextMutedLight: { color: '#cfdef2' },
+  pricingTextMutedLight: { color: palette.greenSoft },
   pricingCta: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: palette.blue, borderRadius: 7, flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 24, minHeight: 44, paddingHorizontal: 14 },
+  privatePricingCta: { backgroundColor: palette.blueDark },
   pricingCtaPlatinum: { backgroundColor: palette.white },
   pricingCtaText: { color: palette.white, fontSize: 12, fontWeight: '900' },
   pricingCtaTextPlatinum: { color: palette.blueDark },
@@ -678,10 +741,10 @@ const styles = StyleSheet.create({
   finalCta: { alignItems: 'center', alignSelf: 'center', backgroundColor: palette.blueDark, flexDirection: 'row', justifyContent: 'space-between', marginTop: 80, minHeight: 250, paddingHorizontal: 58, paddingVertical: 48, width: '100%', maxWidth: 1280 },
   finalCtaCompact: { alignItems: 'flex-start', flexDirection: 'column', gap: 28, marginTop: 42, paddingHorizontal: 24 },
   finalCtaCopy: { maxWidth: 680 },
-  finalCtaKicker: { color: '#9fc5f3', fontSize: 10, fontWeight: '900', letterSpacing: 1.15 },
+  finalCtaKicker: { color: palette.greenSoft, fontSize: 10, fontWeight: '900', letterSpacing: 1.15 },
   finalCtaTitle: { color: palette.white, fontFamily: displayFont, fontSize: 44, fontWeight: '700', letterSpacing: -1, marginTop: 11 },
   finalCtaTitleCompact: { fontSize: 35 },
-  finalCtaText: { color: '#cfdef2', fontSize: 14, lineHeight: 22, marginTop: 12 },
+  finalCtaText: { color: palette.greenSoft, fontSize: 14, lineHeight: 22, marginTop: 12 },
   finalCtaActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   footer: { alignItems: 'flex-start', alignSelf: 'center', flexDirection: 'row', gap: 36, justifyContent: 'space-between', paddingHorizontal: 42, paddingVertical: 54, width: '100%', maxWidth: 1280 },
   footerCompact: { flexDirection: 'column' },

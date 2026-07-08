@@ -24,8 +24,26 @@
     },
     "plugins": [
       "expo-video",
+      [
+        "expo-status-bar",
+        {
+          "hidden": false,
+          "style": "dark"
+        }
+      ],
       "expo-build-properties",
-      "react-native-bottom-tabs"
+      "react-native-bottom-tabs",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": [
+            "en",
+            "ckb-IQ"
+          ],
+          "supportsRTL": true
+        }
+      ],
+      "expo-font"
     ]
   }
 }
