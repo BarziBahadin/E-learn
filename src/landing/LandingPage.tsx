@@ -34,6 +34,7 @@ import {
   View,
 } from 'react-native';
 import { Text } from '../i18n/Text';
+import { useI18n } from '../i18n/I18nProvider';
 import {
   ACADEMIC_YEAR_ACCESS_MODEL,
   formatIQD,
@@ -166,6 +167,7 @@ function LandingButton({
 }
 
 export default function LandingPage({ onStartDemo }: LandingPageProps) {
+  const { language, setPreference } = useI18n();
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const narrow = width < 460;
@@ -187,6 +189,10 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
   const goTo = (key: SectionKey) => {
     setMenuOpen(false);
     scrollRef.current?.scrollTo({ animated: true, y: Math.max(0, sectionOffsets.current[key] - 74) });
+  };
+
+  const toggleLanguage = () => {
+    void setPreference(language === 'ckb' ? 'en' : 'ckb');
   };
 
   const openStore = (store: 'ios' | 'android') => {
@@ -228,6 +234,18 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
 
           <View style={styles.headerActions}>
             {!narrow && (
+              <Pressable
+                accessibilityLabel={language === 'ckb' ? 'Switch language to English' : 'Switch language to Kurdish'}
+                accessibilityRole="button"
+                onPress={toggleLanguage}
+                style={styles.languageToggle}
+              >
+                <Text style={[styles.languageToggleText, language === 'en' && styles.languageToggleTextActive]}>EN</Text>
+                <View style={styles.languageToggleDivider} />
+                <Text style={[styles.languageToggleText, language === 'ckb' && styles.languageToggleTextActive]}>کوردی</Text>
+              </Pressable>
+            )}
+            {!narrow && (
               <Pressable onPress={() => onStartDemo()} style={styles.signInButton}>
                 <Text style={styles.signInText}>Sign in</Text>
               </Pressable>
@@ -244,6 +262,17 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
         </View>
         {compact && menuOpen && (
           <View style={styles.mobileMenu}>
+            {narrow && (
+              <Pressable
+                accessibilityLabel={language === 'ckb' ? 'Switch language to English' : 'Switch language to Kurdish'}
+                accessibilityRole="button"
+                onPress={toggleLanguage}
+                style={styles.mobileLanguageToggle}
+              >
+                <Text style={styles.mobileLanguageLabel}>Language</Text>
+                <Text style={styles.mobileLanguageValue}>{language === 'ckb' ? 'کوردی' : 'English'}</Text>
+              </Pressable>
+            )}
             {navItems.map((item) => (
               <Pressable key={item.section} onPress={() => goTo(item.section)} style={styles.mobileNavLink}>
                 <Text style={styles.mobileNavText}>{item.label}</Text>
@@ -373,12 +402,21 @@ export default function LandingPage({ onStartDemo }: LandingPageProps) {
                 key={plan.id}
                 style={[
                   styles.pricingCard,
+                  plan.id === 'gold' && styles.pricingCardPopular,
                   plan.id === 'platinum' && styles.pricingCardPlatinum,
                 ]}
                 tintColor={plan.id === 'platinum' ? 'rgba(7,60,133,0.72)' : 'rgba(255,255,255,0.52)'}
               >
                 <View style={styles.pricingCardHeader}>
-                  <Text style={[styles.pricingTier, plan.id === 'platinum' && styles.pricingTextLight]}>{plan.tierName}</Text>
+                  <View style={styles.pricingTitleStack}>
+                    {plan.id === 'gold' && (
+                      <View style={styles.popularBadge}>
+                        <Sparkles color="#7A4F0F" size={12} />
+                        <Text style={styles.popularBadgeText}>Most popular</Text>
+                      </View>
+                    )}
+                    <Text style={[styles.pricingTier, plan.id === 'platinum' && styles.pricingTextLight]}>{plan.tierName}</Text>
+                  </View>
                   <View style={[
                     styles.pricingDot,
                     plan.id === 'bronze' && styles.pricingDotBronze,
@@ -593,12 +631,19 @@ const styles = StyleSheet.create({
   navLink: { borderRadius: 7, paddingHorizontal: 13, paddingVertical: 10 },
   navLinkText: { color: palette.ink, fontSize: 13, fontWeight: '600' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  languageToggle: { alignItems: 'center', backgroundColor: palette.paper, borderColor: palette.line, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 7, minHeight: 40, paddingHorizontal: 12 },
+  languageToggleText: { color: palette.muted, fontSize: 12, fontWeight: '800' },
+  languageToggleTextActive: { color: palette.blueDark },
+  languageToggleDivider: { backgroundColor: palette.line, height: 14, width: 1 },
   signInButton: { paddingHorizontal: 12, paddingVertical: 10 },
   signInText: { color: palette.blue, fontSize: 13, fontWeight: '700' },
   headerCta: { backgroundColor: palette.blueDark, borderRadius: 7, minHeight: 40, justifyContent: 'center', paddingHorizontal: 16 },
   headerCtaText: { color: palette.white, fontSize: 13, fontWeight: '700' },
   menuButton: { alignItems: 'center', height: 42, justifyContent: 'center', width: 42 },
   mobileMenu: { backgroundColor: palette.paper, borderTopColor: palette.line, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 20, paddingVertical: 10 },
+  mobileLanguageToggle: { alignItems: 'center', backgroundColor: palette.cream, borderColor: palette.line, borderRadius: 10, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 48, paddingHorizontal: 14 },
+  mobileLanguageLabel: { color: palette.muted, fontSize: 12, fontWeight: '800' },
+  mobileLanguageValue: { color: palette.blueDark, fontSize: 14, fontWeight: '800' },
   mobileNavLink: { alignItems: 'center', borderBottomColor: palette.line, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 48 },
   mobileNavText: { color: palette.ink, fontSize: 14, fontWeight: '700' },
   hero: { alignItems: 'stretch', alignSelf: 'center', flexDirection: 'row', minHeight: 650, width: '100%', maxWidth: 1280 },
@@ -670,9 +715,13 @@ const styles = StyleSheet.create({
   pricingGrid: { alignItems: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 48 },
   pricingGridCompact: { flexDirection: 'column' },
   pricingCard: { backgroundColor: palette.paper, borderColor: palette.line, borderRadius: 10, borderWidth: 1, flex: 1, minWidth: 250, padding: 24 },
+  pricingCardPopular: { backgroundColor: Platform.OS === 'web' ? '#FFF8E7' : '#fff8e8', borderColor: '#D39A2C', borderWidth: 2, shadowColor: '#A9782D', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 24 },
   privatePricingCard: { borderColor: Platform.OS === 'web' ? palette.line : '#b8cce5' },
   pricingCardPlatinum: { backgroundColor: palette.blueDark, borderColor: palette.blueDark },
   pricingCardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  pricingTitleStack: { alignItems: 'flex-start', gap: 9 },
+  popularBadge: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#FFE7AE', borderColor: '#E2B454', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 9, paddingVertical: 5 },
+  popularBadgeText: { color: '#7A4F0F', fontSize: 10, fontWeight: '900', letterSpacing: 0.25 },
   pricingTier: { color: palette.ink, fontSize: 12, fontWeight: '900', letterSpacing: 0.55 },
   pricingDot: { borderRadius: 6, height: 12, width: 12 },
   pricingDotBronze: { backgroundColor: Platform.OS === 'web' ? palette.green : '#a96735' },

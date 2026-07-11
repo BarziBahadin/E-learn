@@ -7,9 +7,34 @@ import {
   pricingSystemConstraints,
   subjectsForPlan,
 } from './academicYearPlans';
+import { paymentProviderById, paymentProviders } from './paymentProviders';
 
 it('uses Biology instead of Mathematics in Gold', () => {
   expect(subjectsForPlan(pricingPlanById('gold'))).toEqual(['Biology', 'Physics', 'Chemistry']);
+});
+
+describe('Iraq payment providers', () => {
+  it('includes the requested online payment services', () => {
+    expect(paymentProviders.map((provider) => provider.id)).toEqual([
+      'fib',
+      'fastpay',
+      'nass',
+      'zaincash',
+      'qi',
+    ]);
+  });
+
+  it('keeps production credentials account-gated and server-owned', () => {
+    for (const provider of paymentProviders) {
+      expect(provider.productionAccountRequired).toBe(true);
+      expect(provider.credentials.length).toBeGreaterThan(0);
+      expect(provider.accountRequirement.toLowerCase()).toMatch(/account|partner|onboarding|credentials|request/);
+    }
+
+    expect(paymentProviderById('zaincash').credentials).toContain('API key');
+    expect(paymentProviderById('fib').credentials).toEqual(['client_id', 'client_secret']);
+    expect(paymentProviderById('qi').credentials).toContain('X-Terminal-Id');
+  });
 });
 
 describe('academic-year pricing plans', () => {

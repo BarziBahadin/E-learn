@@ -56,8 +56,11 @@ export const guardianStudents = [
 
 export const revenueRows = [
   { date: '30 Jun 2026', source: 'Bronze · Physics', teacher: 'Ahmed Hassan', method: 'Wallet / voucher', amount: '89,000 IQD', status: 'Completed' },
-  { date: '30 Jun 2026', source: 'Silver · Math + Physics', teacher: 'Multiple teachers', method: 'ZainCash', amount: '159,000 IQD', status: 'Completed' },
-  { date: '29 Jun 2026', source: 'Gold · Biology + Physics + Chemistry', teacher: 'Multiple teachers', method: 'FastPay', amount: '199,000 IQD', status: 'Completed' },
+  { date: '30 Jun 2026', source: 'Silver · Math + Physics', teacher: 'Multiple teachers', method: 'ZainCash', amount: '179,750 IQD', status: 'Completed' },
+  { date: '29 Jun 2026', source: 'Gold · Biology + Physics + Chemistry', teacher: 'Multiple teachers', method: 'FastPay', amount: '259,750 IQD', status: 'Completed' },
+  { date: '29 Jun 2026', source: 'Bronze · English', teacher: 'Rojin Aziz', method: 'FIB', amount: '99,750 IQD', status: 'Completed' },
+  { date: '28 Jun 2026', source: 'Silver · Chemistry + Biology', teacher: 'Multiple teachers', method: 'NASS', amount: '179,750 IQD', status: 'Pending' },
+  { date: '28 Jun 2026', source: 'Wallet top-up', teacher: 'Platform wallet', method: 'QiCard', amount: '100,000 IQD', status: 'Completed' },
   { date: '28 Jun 2026', source: 'Bronze · Chemistry', teacher: 'Shilan Omar', method: 'Wallet / voucher', amount: '-89,000 IQD', status: 'Refunded' },
 ];
 
@@ -67,4 +70,3 @@ export const adminUsers = [
   { id: 'user_789', name: 'Ahmed Hassan', email: 'ahmed.teacher@example.com', role: 'Teacher', wallet: '—', courses: 'Grade 12 Physics', subscription: '—' },
   { id: 'user_654', name: 'Nawroz Kamal', email: 'nawroz@example.com', role: 'Parent', wallet: '—', courses: '—', subscription: '—' },
 ];
-

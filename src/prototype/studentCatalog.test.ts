@@ -8,8 +8,9 @@ import {
 
 describe('student catalog', () => {
   it('contains selectable chapters and lessons for each course', () => {
-    expect(studentCourses).toHaveLength(3);
+    expect(studentCourses).toHaveLength(7);
     for (const course of studentCourses) {
+      expect(course.instructors).toHaveLength(3);
       expect(course.chapters.length).toBeGreaterThan(0);
       expect(courseLessons(course).length).toBeGreaterThan(0);
     }
@@ -32,6 +33,10 @@ describe('student catalog', () => {
       'Physics',
       'Mathematics',
       'Chemistry',
+      'Biology',
+      'English',
+      'Kurdish',
+      'Arabic',
     ]);
     expect(studentCourses.every((course) => course.level === 'Grade 12')).toBe(true);
   });

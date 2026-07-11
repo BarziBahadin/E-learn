@@ -1,8 +1,18 @@
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
-import PrototypeApp from './src/prototype/PrototypeApp';
-import { I18nProvider } from './src/i18n/I18nProvider';
 import { useFonts } from 'expo-font';
+import { ProductionAppShell } from './src/app/ProductionAppShell';
+import DemoApp from '@e-lern/demo-app';
+
+const demoModeEnabled =
+  process.env.EXPO_PUBLIC_APP_MODE === 'demo' &&
+  process.env.EXPO_PUBLIC_ENABLE_DEMO_APP === 'true';
+
+function AppExperience() {
+  if (!demoModeEnabled) return <ProductionAppShell />;
+
+  return <DemoApp />;
+}
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -15,10 +25,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <I18nProvider>
-        <StatusBar hidden={false} style="dark" />
-        <PrototypeApp />
-      </I18nProvider>
+      <StatusBar hidden={false} style="dark" />
+      <AppExperience />
     </SafeAreaProvider>
   );
 }

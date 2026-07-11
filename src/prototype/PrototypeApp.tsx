@@ -1,5 +1,3 @@
-import { useEvent } from 'expo';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   Activity,
   BarChart3,
@@ -25,7 +23,6 @@ import {
   Lock,
   LockKeyhole,
   LogOut,
-  Pause,
   Play,
   PlayCircle,
   Plus,
@@ -34,7 +31,6 @@ import {
   ShieldCheck,
   Smartphone,
   Search,
-  Square,
   Send,
   TicketCheck,
   WalletCards,
@@ -46,10 +42,11 @@ import {
   WifiOff,
   Zap,
 } from 'lucide-react-native';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Image,
+  type ImageSourcePropType,
   Platform,
   Pressable,
   ScrollView,
@@ -58,6 +55,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { Text } from '../i18n/Text';
 import { useI18n, type LanguagePreference } from '../i18n/I18nProvider';
 import {
@@ -100,6 +98,10 @@ import {
 } from './platformDemoData';
 import LandingPage from '../landing/LandingPage';
 import { DynamicWatermark } from '../features/playback/DynamicWatermark';
+import {
+  LessonVideoPlayer,
+  type LessonVideoPlayerHandle,
+} from '../features/playback/LessonVideoPlayer';
 import type { PlaybackWatermark } from '../features/playback/watermark';
 import {
   ACADEMIC_YEAR_ACCESS_MODEL,
@@ -114,6 +116,11 @@ import {
   type AcademicSubject,
   type PricingPlanId,
 } from '../features/pricing/academicYearPlans';
+import {
+  paymentProviderById,
+  paymentProviders,
+  type PaymentProviderId,
+} from '../features/pricing/paymentProviders';
 import { NativeTabShell } from '../navigation/NativeTabShell';
 import { GlassSurface } from '../ui/GlassSurface';
 import { useThemePreference, type ThemePreference } from '../features/theme/useThemePreference';
@@ -138,6 +145,19 @@ type ClientSession = {
 };
 
 const VIDEO_SOURCE = require('../../assets/mixkit-hands-of-a-person-typing-on-a-cell-phone-4915-full-hd.mp4');
+
+const paymentProviderLogoSources: Partial<Record<PaymentProviderId, ImageSourcePropType>> = {
+  fib: require('../../assets/payment-providers/fib.png'),
+  fastpay: require('../../assets/payment-providers/fastpay.png'),
+  nass: require('../../assets/payment-providers/nass.png'),
+  zaincash: require('../../assets/payment-providers/zaincash.png'),
+};
+
+const QI_LOGO_SVG = `<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M86.2832 163.116C99.2443 165.571 111.542 164.636 123.589 160.157C124.736 159.731 126.815 159.948 127.613 160.732C135.658 168.625 143.525 176.699 151.499 184.781C119.367 206.619 63.1886 207.333 26.246 167.391C-9.97274 128.231 -8.53099 67.5577 29.4866 28.8546C65.5641 -7.87339 127.062 -9.73474 165.614 24.3929C207.039 61.063 207.111 118.003 185.323 150.714C184.291 149.818 183.229 149.013 182.304 148.072C175.556 141.207 168.907 134.242 162.061 127.476C160.127 125.565 159.93 123.962 160.787 121.435C171.293 90.4786 159.221 59.0593 130.734 42.8753C97.5346 24.0139 52.8541 40.7795 39.5507 76.4861C28.6368 105.779 39.3833 139.412 67.6966 155.777C73.2911 159.01 79.8175 160.63 86.2832 163.116Z" fill="#FDC905"/>
+<path d="M177.781 153.934C183.499 159.683 189.043 165.149 194.461 170.737C201.631 178.132 201.839 188.07 195.087 194.871C188.186 201.823 177.918 201.735 170.573 194.436C153.684 177.653 136.845 160.818 120.069 143.922C112.595 136.394 112.497 125.906 119.597 119.061C126.261 112.638 137.031 113.173 144.217 120.341C155.346 131.445 166.441 142.582 177.781 153.934Z" fill="#FDC905"/>
+<path d="M116.692 89.9442C121.015 99.3013 119.24 108 111.974 114.249C105.93 119.447 96.9004 120.032 89.8304 115.684C82.4031 111.117 78.7836 102.21 81.3805 93.8653C83.6407 86.6024 88.6652 81.7413 96.2044 80.49C104.769 79.0685 111.827 81.9659 116.692 89.9442Z" fill="#FDC906"/>
+</svg>`;
 
 const isIOS = Platform.OS === 'ios';
 const isWeb = Platform.OS === 'web';
@@ -261,6 +281,23 @@ function Button({
   );
 }
 
+function PaymentProviderLogo({ providerId }: { providerId: PaymentProviderId }) {
+  const { colors, styles } = usePrototypeTheme();
+  const source = paymentProviderLogoSources[providerId];
+
+  return (
+    <View style={styles.gatewayLogoTile}>
+      {providerId === 'qi' ? (
+        <SvgXml height={22} width={22} xml={QI_LOGO_SVG} />
+      ) : source ? (
+        <Image resizeMode="contain" source={source} style={styles.gatewayLogoImage} />
+      ) : (
+        <CreditCard color={colors.blue} size={18} />
+      )}
+    </View>
+  );
+}
+
 function Metric({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) {
   const { styles } = usePrototypeTheme();
   return (
@@ -307,6 +344,7 @@ function PrototypeExperience() {
   const [pendingPricingPlanId, setPendingPricingPlanId] = useState<PricingPlanId | null>(null);
   const [selectedPricingPlanType, setSelectedPricingPlanType] = useState<'standard' | 'private'>('standard');
   const [unlockMethod, setUnlockMethod] = useState<'Wallet' | 'Coupon' | 'Manual payment' | 'Online payment'>('Wallet');
+  const [selectedPaymentProviderId, setSelectedPaymentProviderId] = useState<PaymentProviderId>('zaincash');
   const [couponCode, setCouponCode] = useState('WELCOME12');
   const [notifications, setNotifications] = useState(initialNotifications);
   const [supportMessage, setSupportMessage] = useState('I need help accessing my lesson attachment.');
@@ -322,11 +360,8 @@ function PrototypeExperience() {
   const [userSearch, setUserSearch] = useState('');
   const [selectedAdminUserId, setSelectedAdminUserId] = useState(adminUsers[0].id);
 
-  const player = useVideoPlayer(VIDEO_SOURCE, (videoPlayer) => {
-    videoPlayer.loop = true;
-    videoPlayer.pause();
-  });
-  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const videoPlayerRef = useRef<LessonVideoPlayerHandle>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const activeLock = currentUser ? state.locks[currentUser.id] : undefined;
   const ownsActiveLock = Boolean(
@@ -358,6 +393,7 @@ function PrototypeExperience() {
         tierName: `Private ${basePricingPlan.shortName}`,
       }
     : basePricingPlan;
+  const selectedPaymentProvider = paymentProviderById(selectedPaymentProviderId);
   const filteredAdminUsers = useMemo(() => adminUsers.filter((user) =>
     `${user.name} ${user.email} ${user.id}`.toLowerCase().includes(userSearch.trim().toLowerCase()),
   ), [userSearch]);
@@ -397,11 +433,12 @@ function PrototypeExperience() {
 
   useEffect(() => {
     if (clientSession && !activeLock) {
-      player.pause();
+      videoPlayerRef.current?.pause();
       setClientSession(null);
+      setIsPlaying(false);
       setNotice('Playback ended after the protected connection expired. Start the lesson again to continue.');
     }
-  }, [activeLock, clientSession, player]);
+  }, [activeLock, clientSession]);
 
   const currentUserDevices = useMemo(
     () => state.devices.filter((device) => device.user_id === currentUser?.id),
@@ -469,17 +506,8 @@ function PrototypeExperience() {
     setHeartbeatIn(HEARTBEAT_INTERVAL_SECONDS);
     setConflict(null);
     setNotice('Lesson started with protected playback.');
-    player.play();
-  }, [currentDevice, currentUser, player, selectedCourse, selectedLesson, state]);
-
-  const togglePlayback = useCallback(() => {
-    if (!ownsActiveLock) {
-      start();
-      return;
-    }
-    if (isPlaying) player.pause();
-    else player.play();
-  }, [isPlaying, ownsActiveLock, player, start]);
+    videoPlayerRef.current?.play();
+  }, [currentDevice, currentUser, selectedCourse, selectedLesson, state]);
 
   const sendHeartbeat = useCallback((session = clientSession) => {
     if (!currentUser || !session) return;
@@ -496,22 +524,8 @@ function PrototypeExperience() {
         ? 'Heartbeat accepted. The lock TTL is back to 90 seconds.'
         : `Heartbeat rejected: ${refreshed.result.reason}.`,
     );
-    if (!refreshed.result.ok && session === clientSession) player.pause();
-  }, [clientSession, currentUser, player, state]);
-
-  const stopSession = useCallback(() => {
-    if (!currentUser || !currentDevice || !clientSession) return;
-    const ended = endPlayback(state, {
-      user_id: currentUser.id,
-      device_id: currentDevice.device_id,
-      session_id: clientSession.sessionId,
-      reason: 'USER_STOPPED',
-    });
-    setState(ended.state);
-    player.pause();
-    setClientSession(null);
-    setNotice(ended.result.ok ? 'Playback ended.' : 'Playback could not be ended. Please try again.');
-  }, [clientSession, currentDevice, currentUser, player, state]);
+    if (!refreshed.result.ok && session === clientSession) videoPlayerRef.current?.pause();
+  }, [clientSession, currentUser, state]);
 
   const simulateSecondDevice = useCallback(() => {
     if (!currentUser || !selectedCourse || !selectedLesson) return;
@@ -566,8 +580,8 @@ function PrototypeExperience() {
     setHeartbeatsEnabled(true);
     setHeartbeatIn(HEARTBEAT_INTERVAL_SECONDS);
     setNotice('Force switch complete. The old session ended and lock version increased.');
-    player.play();
-  }, [clientSession, conflictDevice, currentUser, player, selectedCourse, selectedLesson, state]);
+    videoPlayerRef.current?.play();
+  }, [clientSession, conflictDevice, currentUser, selectedCourse, selectedLesson, state]);
 
   const openCourse = useCallback((courseToOpen: StudentCourse) => {
     const lessons = courseLessons(courseToOpen);
@@ -633,11 +647,13 @@ function PrototypeExperience() {
     setNotice(
       unlockMethod === 'Manual payment'
         ? `Payment proof uploaded for ${selectedPricingPlan.tierName}. Demo admin approval completed and access is active.`
+        : unlockMethod === 'Online payment'
+          ? `${selectedPaymentProvider.name} payment verified for ${selectedPricingPlan.tierName}. Enrollment and notification rows were created.`
         : `${selectedPricingPlan.tierName} activated for ${pathLabel(selectedPlanSubjects)}. Enrollment and notification rows were created.`,
     );
     setPendingPricingPlanId(null);
     if (course) openCourse(course);
-  }, [checkoutCourse, couponCode, openCourse, selectedPlanSubjects, selectedPricingPlan, unlockMethod, walletBalance]);
+  }, [checkoutCourse, couponCode, openCourse, selectedPaymentProvider, selectedPlanSubjects, selectedPricingPlan, unlockMethod, walletBalance]);
 
   const redeemVoucher = useCallback(() => {
     const normalized = voucherCode.trim().toUpperCase();
@@ -694,7 +710,8 @@ function PrototypeExperience() {
       });
       setState(ended.state);
       setClientSession(null);
-      player.pause();
+      videoPlayerRef.current?.pause();
+      setIsPlaying(false);
     }
 
     setSelectedCourseId(courseToOpen.id);
@@ -702,7 +719,7 @@ function PrototypeExperience() {
     setExpandedChapterIds((current) => current.includes(chapterId) ? current : [...current, chapterId]);
     setPage('Lesson');
     setNotice(`Selected “${lesson.title}”. Start playback when ready.`);
-  }, [clientSession, currentDevice, currentUser, player, state]);
+  }, [clientSession, currentDevice, currentUser, state]);
 
   const markLessonComplete = useCallback(() => {
     if (!selectedLesson) return;
@@ -733,7 +750,7 @@ function PrototypeExperience() {
   }, []);
 
   const resetDemo = useCallback(() => {
-    player.pause();
+    videoPlayerRef.current?.pause();
     setState(createDemoState());
     setCurrentUser(null);
     setCurrentDevice(null);
@@ -755,10 +772,11 @@ function PrototypeExperience() {
     setNotice('Register a device to begin the demo.');
     setAuthStep('account');
     setShowLanding(true);
-  }, [player]);
+    setIsPlaying(false);
+  }, []);
 
   const switchUser = useCallback(() => {
-    player.pause();
+    videoPlayerRef.current?.pause();
     setCurrentUser(null);
     setCurrentDevice(null);
     setClientSession(null);
@@ -772,7 +790,8 @@ function PrototypeExperience() {
     setPendingPricingPlanId(null);
     setShowLanding(false);
     setNotice('Choose another role. Existing demo sessions and audit records are preserved.');
-  }, [player]);
+    setIsPlaying(false);
+  }, []);
 
   if (!currentUser || !currentDevice) {
     if (showLanding) {
@@ -792,62 +811,68 @@ function PrototypeExperience() {
 
     return (
       <SafeAreaView style={styles.screen}>
-        <View style={styles.loginShell}>
-          <Pressable onPress={() => setShowLanding(true)} style={styles.backToLanding}>
-            <Text style={styles.backToLandingText}>Back to website</Text>
-          </Pressable>
-          <View style={styles.loginBrand}>
-            <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandImage} /></View>
-            <Text style={styles.brandName}>E-Lern</Text>
-          </View>
-          <View style={styles.loginPanel}>
-            <Pill label="Interactive prototype" tone="success" />
-            <Text style={styles.loginTitle}>Grade 12 learning demo</Text>
-            <Text style={styles.loginSubtitle}>Choose a role, verify the demo OTP, and explore the complete learning platform.</Text>
-            <Text style={styles.fieldLabel}>Mock user</Text>
-            <View style={styles.userOptions}>
-              {availableUsers.map((user) => {
-                const selected = selectedUserId === user.id;
-                return (
-                  <Pressable
-                    key={user.id}
-                    onPress={() => setSelectedUserId(user.id)}
-                    style={[styles.userOption, selected && styles.userOptionSelected]}
-                  >
-                    <View style={[styles.userIcon, selected && styles.userIconSelected]}><UserRound color={selected ? colors.white : colors.greenDark} size={20} /></View>
-                    <View style={styles.userOptionCopy}>
-                      <View style={styles.userNameLine}>
-                        <Text style={styles.userName}>{user.name}</Text>
-                        <Pill label={user.role === 'student' ? 'Student' : user.role === 'parent' ? 'Parent' : user.role === 'teacher' ? 'Teacher' : 'Admin'} tone={user.role === 'student' ? 'success' : 'warning'} />
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          style={styles.loginScroll}
+          contentContainerStyle={styles.loginScrollContent}
+        >
+          <View style={styles.loginShell}>
+            <Pressable onPress={() => setShowLanding(true)} style={styles.backToLanding}>
+              <Text style={styles.backToLandingText}>Back to website</Text>
+            </Pressable>
+            <View style={styles.loginBrand}>
+              <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandImage} /></View>
+              <Text style={styles.brandName}>E-Lern</Text>
+            </View>
+            <View style={styles.loginPanel}>
+              <Pill label="Interactive prototype" tone="success" />
+              <Text style={styles.loginTitle}>Grade 12 learning demo</Text>
+              <Text style={styles.loginSubtitle}>Choose a role, verify the demo OTP, and explore the complete learning platform.</Text>
+              <Text style={styles.fieldLabel}>Mock user</Text>
+              <View style={styles.userOptions}>
+                {availableUsers.map((user) => {
+                  const selected = selectedUserId === user.id;
+                  return (
+                    <Pressable
+                      key={user.id}
+                      onPress={() => setSelectedUserId(user.id)}
+                      style={[styles.userOption, selected && styles.userOptionSelected]}
+                    >
+                      <View style={[styles.userIcon, selected && styles.userIconSelected]}><UserRound color={selected ? colors.white : colors.greenDark} size={20} /></View>
+                      <View style={styles.userOptionCopy}>
+                        <View style={styles.userNameLine}>
+                          <Text style={styles.userName}>{user.name}</Text>
+                          <Pill label={user.role === 'student' ? 'Student' : user.role === 'parent' ? 'Parent' : user.role === 'teacher' ? 'Teacher' : 'Admin'} tone={user.role === 'student' ? 'success' : 'warning'} />
+                        </View>
+                        <Text style={styles.userMeta}>{user.id} · {user.email}</Text>
                       </View>
-                      <Text style={styles.userMeta}>{user.id} · {user.email}</Text>
-                    </View>
-                    {selected && <Check color={colors.green} size={20} />}
-                  </Pressable>
-                );
-              })}
-            </View>
-            {authStep === 'otp' && (
-              <View style={styles.otpPanel}>
-                <View><Text style={styles.registrationTitle}>Verify email or phone</Text><Text style={styles.registrationMeta}>Demo code: 123456</Text></View>
-                <TextInput accessibilityLabel={translate('One-time password')} keyboardType="number-pad" maxLength={6} onChangeText={setOtp} style={styles.textInput} value={otp} />
+                      {selected && <Check color={colors.green} size={20} />}
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
-            <View style={styles.registrationPreview}>
-              {isIOS ? <Smartphone color={colors.blue} size={20} /> : <Laptop color={colors.blue} size={20} />}
-              <View style={styles.registrationCopy}>
-                <Text style={styles.registrationTitle}>{isIOS ? 'This iPhone' : 'Chrome on Mac'}</Text>
-                <Text style={styles.registrationMeta}>Platform: {isIOS ? 'iOS' : 'web'} · IP and user-agent stored as hashes</Text>
+              {authStep === 'otp' && (
+                <View style={styles.otpPanel}>
+                  <View><Text style={styles.registrationTitle}>Verify email or phone</Text><Text style={styles.registrationMeta}>Demo code: 123456</Text></View>
+                  <TextInput accessibilityLabel={translate('One-time password')} keyboardType="number-pad" maxLength={6} onChangeText={setOtp} style={styles.textInput} value={otp} />
+                </View>
+              )}
+              <View style={styles.registrationPreview}>
+                {isIOS ? <Smartphone color={colors.blue} size={20} /> : <Laptop color={colors.blue} size={20} />}
+                <View style={styles.registrationCopy}>
+                  <Text style={styles.registrationTitle}>{isIOS ? 'This iPhone' : 'Chrome on Mac'}</Text>
+                  <Text style={styles.registrationMeta}>Platform: {isIOS ? 'iOS' : 'web'} · IP and user-agent stored as hashes</Text>
+                </View>
               </View>
+              <Button
+                label={authStep === 'account' ? 'Send demo OTP' : 'Verify and continue'}
+                icon={<KeyRound color={colors.white} size={17} />}
+                onPress={login}
+              />
             </View>
-            <Button
-              label={authStep === 'account' ? 'Send demo OTP' : 'Verify and continue'}
-              icon={<KeyRound color={colors.white} size={17} />}
-              onPress={login}
-            />
+            <Text style={styles.loginFootnote}>Auth, payments, storage, notifications, and DRM are simulated. Playback locking uses the in-memory Redis and SQL model.</Text>
           </View>
-          <Text style={styles.loginFootnote}>Auth, payments, storage, notifications, and DRM are simulated. Playback locking uses the in-memory Redis and SQL model.</Text>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1032,7 +1057,7 @@ function PrototypeExperience() {
                         <View style={styles.teacherCopy}>
                           <Text style={styles.courseCardTitle}>{teacher.name}</Text>
                           <Text style={styles.teacherSubject}>{teacher.subject}</Text>
-                          <Text style={styles.courseCardDescription}>{teacher.bio}</Text>
+                          <Text numberOfLines={2} style={styles.discoverTeacherBio}>{teacher.bio}</Text>
                           <Text style={styles.courseStat}>{teacher.students} students · {teacher.completionRate}% completion</Text>
                         </View>
                         {selected ? <View style={styles.discoverSelectedCheck}><Check color={colors.white} size={19} /></View> : <ChevronRight color={colors.greenDark} size={22} />}
@@ -1047,12 +1072,12 @@ function PrototypeExperience() {
                   {discoverCourses.map((courseItem) => {
                     const enrolled = enrolledCourseIds.includes(courseItem.id);
                     return (
-                      <View key={courseItem.id} style={styles.discoverCourseRow}>
+                      <View key={courseItem.id} style={[styles.discoverCourseRow, compact && styles.discoverCourseRowCompact]}>
                         <View style={styles.discoverCourseIcon}><CourseCategoryIcon category={courseItem.category} size={26} /></View>
-                        <View style={styles.discoverCourseCopy}>
-                          <Text style={styles.courseCardTitle}>{courseItem.title}</Text>
-                          <Text style={styles.courseCardInstructor}>by {courseItem.instructor}</Text>
-                          <Text numberOfLines={2} style={styles.courseCardDescription}>{courseItem.description}</Text>
+                        <View style={[styles.discoverCourseCopy, compact && styles.discoverCourseCopyCompact]}>
+                          <Text numberOfLines={2} style={styles.courseCardTitle}>{courseItem.title}</Text>
+                          <Text numberOfLines={2} style={styles.courseCardInstructor}>by {courseItem.instructors.join(', ')}</Text>
+                          <Text numberOfLines={2} style={styles.discoverCourseDescription}>{courseItem.description}</Text>
                           <View style={styles.discoverCourseActions}>
                             <Button label="Free preview" tone="secondary" onPress={() => previewCourse(courseItem)} />
                             <Button label={enrolled ? 'Open course' : 'Unlock course'} onPress={() => enrolled ? openCourse(courseItem) : openCheckout(courseItem.id)} />
@@ -1078,10 +1103,10 @@ function PrototypeExperience() {
               </View>
               <View style={[styles.planGrid, compact && styles.planGridCompact]}>
                 {pricingPlans.map((plan) => (
-                  <GlassSurface glassStyle={styles.nativeGlassClear} key={plan.id} style={[styles.planCard, plan.id === 'platinum' && styles.planCardVip]} tintColor={plan.id === 'platinum' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.5)'}>
+                  <GlassSurface glassStyle={styles.nativeGlassClear} key={plan.id} style={[styles.planCard, plan.id === 'gold' && styles.planCardPopular, plan.id === 'platinum' && styles.planCardVip]} tintColor={plan.id === 'platinum' ? 'rgba(0,0,0,0.7)' : plan.id === 'gold' ? 'rgba(255,248,231,0.74)' : 'rgba(255,255,255,0.5)'}>
                     <View style={styles.courseCardTop}>
                       <Text style={[styles.planName, plan.id === 'platinum' && styles.planTextVip]}>{plan.tierName}</Text>
-                      <Pill label="Full year" tone={plan.id === 'platinum' ? 'warning' : 'success'} />
+                      <Pill label={plan.id === 'gold' ? 'Most popular' : 'Full year'} tone={plan.id === 'platinum' || plan.id === 'gold' ? 'warning' : 'success'} />
                     </View>
                     <Text style={[styles.planPrice, plan.id === 'platinum' && styles.planTextVip]}>{formatIQD(plan.retailPriceIQD)}</Text>
                     <Text style={[styles.planUnlocks, plan.id === 'platinum' && styles.planTextVipMuted]}>{plan.unlocks}</Text>
@@ -1167,11 +1192,41 @@ function PrototypeExperience() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.segmented}>{(['Wallet', 'Coupon', 'Manual payment', 'Online payment'] as const).map((method) => <Pressable key={method} onPress={() => setUnlockMethod(method)} style={[styles.segment, unlockMethod === method && styles.segmentActive]}><Text style={[styles.segmentText, unlockMethod === method && styles.segmentTextActive]}>{method}</Text></Pressable>)}</View></ScrollView>
                   {unlockMethod === 'Wallet' && <View style={styles.walletCheckout}><WalletCards color={colors.green} size={22} /><View style={styles.notificationCopy}><Text style={styles.registrationTitle}>{formatIQD(walletBalance)} available</Text><Text style={styles.registrationMeta}>The purchase is recorded as voucher-funded when the wallet credit came from a voucher.</Text></View></View>}
                   {unlockMethod === 'Coupon' && <><Text style={styles.fieldLabel}>Access code</Text><TextInput autoCapitalize="characters" onChangeText={setCouponCode} style={styles.textInput} value={couponCode} /><Text style={styles.helperText}>Use WELCOME12 for the successful demo path.</Text></>}
-                  {unlockMethod === 'Manual payment' && <View style={styles.uploadBox}><Upload color={colors.blue} size={24} /><Text style={styles.registrationTitle}>Payment proof ready</Text><Text style={styles.registrationMeta}>fastpay-receipt.jpg · Stored in private payment-proofs bucket</Text></View>}
-                  {unlockMethod === 'Online payment' && <View style={styles.uploadBox}><CreditCard color={colors.blue} size={24} /><Text style={styles.registrationTitle}>ZainCash / FastPay gateway</Text><Text style={styles.registrationMeta}>The demo returns a successful verified transaction.</Text></View>}
+                  {unlockMethod === 'Manual payment' && <View style={styles.uploadBox}><Upload color={colors.blue} size={24} /><Text style={styles.registrationTitle}>Payment proof ready</Text><Text style={styles.registrationMeta}>Bank wallet or cash receipt stored in the private payment-proofs bucket.</Text></View>}
+                  {unlockMethod === 'Online payment' && (
+                    <View style={styles.gatewayStack}>
+                      <View style={styles.gatewayGrid}>
+                        {paymentProviders.map((provider) => {
+                          const selected = selectedPaymentProviderId === provider.id;
+                          return (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityState={{ selected }}
+                              key={provider.id}
+                              onPress={() => setSelectedPaymentProviderId(provider.id)}
+                              style={[styles.gatewayOption, selected && styles.gatewayOptionSelected]}
+                            >
+                              <View style={styles.gatewayOptionTop}>
+                                <PaymentProviderLogo providerId={provider.id} />
+                                <Text style={[styles.gatewayName, selected && styles.gatewayNameSelected]}>{provider.name}</Text>
+                              </View>
+                              <Text style={[styles.gatewayMeta, selected && styles.gatewayMetaSelected]}>
+                                {provider.supportsRedirect ? 'Redirect' : 'QR/app link'} · {provider.supportsWebhook ? 'Webhook' : 'Status check'}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <View style={styles.gatewaySummary}>
+                        <Text style={styles.registrationTitle}>{selectedPaymentProvider.checkoutLabel}</Text>
+                        <Text style={styles.registrationMeta}>{selectedPaymentProvider.accountRequirement}</Text>
+                        <Text style={styles.helperText}>Server credentials: {selectedPaymentProvider.credentials.join(', ')}</Text>
+                      </View>
+                    </View>
+                  )}
                   <Button label={unlockMethod === 'Manual payment' ? 'Upload and submit' : unlockMethod === 'Coupon' ? 'Apply code and unlock' : unlockMethod === 'Wallet' ? 'Pay from wallet' : 'Pay securely'} icon={<KeyRound color={colors.white} size={16} />} onPress={completeUnlock} />
                 </View>
-                <View style={styles.sessionPanel}><Text style={styles.panelEyebrow}>ORDER SUMMARY</Text><Text style={styles.panelTitle}>{selectedPricingPlan.tierName}</Text><Text style={styles.pageSubtitle}>{selectedPricingPlan.unlocks}</Text><View style={styles.detailList}><Detail label="Subjects" value={pathLabel(selectedPlanSubjects)} /><Detail label="Price" value={formatIQD(selectedPricingPlan.retailPriceIQD)} /><Detail label="Access" value="Through Aug/Sep resits" /><Detail label="Enrollment" value="Immediate after approval" /></View></View>
+                <View style={styles.sessionPanel}><Text style={styles.panelEyebrow}>ORDER SUMMARY</Text><Text style={styles.panelTitle}>{selectedPricingPlan.tierName}</Text><Text style={styles.pageSubtitle}>{selectedPricingPlan.unlocks}</Text><View style={styles.detailList}><Detail label="Subjects" value={pathLabel(selectedPlanSubjects)} /><Detail label="Price" value={formatIQD(selectedPricingPlan.retailPriceIQD)} /><Detail label="Access" value="Through Aug/Sep resits" /><Detail label="Payment service" value={unlockMethod === 'Online payment' ? selectedPaymentProvider.name : unlockMethod} /><Detail label="Enrollment" value="Immediate after approval" /></View></View>
               </View>
             </View>
           )}
@@ -1206,7 +1261,7 @@ function PrototypeExperience() {
                         <Pill label={courseItem.category} tone="neutral" />
                       </View>
                       <Text style={styles.courseCardTitle}>{courseItem.title}</Text>
-                      <Text style={styles.courseCardInstructor}>{courseItem.instructor}</Text>
+                      <Text style={styles.courseCardInstructor}>{courseItem.instructors.join(', ')}</Text>
                       <Text style={styles.courseCardDescription}>{courseItem.description}</Text>
                       <View style={styles.courseStats}>
                         <Text style={styles.courseStat}>{courseItem.chapters.length} chapters</Text>
@@ -1243,7 +1298,7 @@ function PrototypeExperience() {
                   <View style={styles.courseSummaryMeta}><Pill label={selectedCourse.category} tone="neutral" /><Text style={styles.courseSummaryLevel}>{selectedCourse.level} · {selectedCourse.duration}</Text></View>
                   <Text style={styles.pageTitle}>{selectedCourse.title}</Text>
                   <Text style={styles.pageSubtitle}>{selectedCourse.description}</Text>
-                  <Text style={styles.courseInstructor}>Instructor: {selectedCourse.instructor}</Text>
+                  <Text style={styles.courseInstructor}>Teachers: {selectedCourse.instructors.join(', ')}</Text>
                 </View>
                 <View style={styles.courseProgressBlock}>
                   <Text style={styles.courseProgressNumber}>{courseProgress(selectedCourse, completedLessonIds)}%</Text>
@@ -1338,12 +1393,16 @@ function PrototypeExperience() {
               <View style={[styles.courseLayout, compact && styles.courseLayoutCompact]}>
                 <View style={styles.playerPanel}>
                   <View style={styles.videoFrame}>
-                    <VideoView
-                      player={player}
+                    <LessonVideoPlayer
+                      allowsPlayback={ownsActiveLock}
+                      ref={videoPlayerRef}
+                      source={VIDEO_SOURCE}
                       style={styles.video}
-                      nativeControls={ownsActiveLock}
                       contentFit="contain"
-                      fullscreenOptions={{ enable: false }}
+                      onDurationChange={() => {}}
+                      onPlayingChange={setIsPlaying}
+                      onStatusChange={() => {}}
+                      onTimeChange={() => {}}
                     />
                     {!ownsActiveLock && (
                       <View style={styles.videoGate}>
@@ -1356,16 +1415,6 @@ function PrototypeExperience() {
                     {ownsActiveLock && clientSession && (
                       <DynamicWatermark watermark={clientSession.watermark} />
                     )}
-                  </View>
-                  <View style={styles.playerControls}>
-                    <Pressable accessibilityLabel={isPlaying ? 'Pause video' : 'Play video'} style={styles.roundControl} onPress={togglePlayback}>
-                      {isPlaying ? <Pause color={colors.white} fill={colors.white} size={18} /> : <Play color={colors.white} fill={colors.white} size={18} />}
-                    </Pressable>
-                    <View style={styles.playerControlCopy}>
-                      <Text style={styles.playerState}>{ownsActiveLock ? (isPlaying ? 'Lesson playing' : 'Paused') : 'Ready to start'}</Text>
-                      <Text style={styles.playerMeta}>{ownsActiveLock ? 'Protected playback' : selectedLesson.duration}</Text>
-                    </View>
-                    {ownsActiveLock && <Button label="End playback" tone="danger" icon={<Square color={colors.white} fill={colors.white} size={13} />} onPress={stopSession} />}
                   </View>
                 </View>
 
@@ -1553,7 +1602,7 @@ function PrototypeExperience() {
 
               {adminView === 'Overview' && <><View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<Users color={colors.green} size={20} />} label="Students" value="2,416" note="128 active today" /><Metric icon={<CreditCard color={colors.blue} size={20} />} label="Pending payments" value={String(payments.filter((item) => item.status === 'Pending').length)} note="Needs review" /><Metric icon={<PlayCircle color={colors.amber} size={20} />} label="Active streams" value={String(Object.keys(state.locks).length)} note="Protected sessions" /><Metric icon={<ShieldAlert color={colors.red} size={20} />} label="Risk events" value={String(state.playback_risk_events.length)} note="Review suspicious activity" /></View><View style={[styles.courseGrid, compact && styles.courseGridCompact]}><Pressable style={styles.quickAction} onPress={() => setAdminView('Content')}><Plus color={colors.green} size={22} /><Text style={styles.studentDeviceName}>Publish content</Text><Text style={styles.courseCardDescription}>Manage subjects, teachers, courses, chapters, lessons, and secure video IDs.</Text></Pressable><Pressable style={styles.quickAction} onPress={() => setAdminView('Payments')}><CreditCard color={colors.blue} size={22} /><Text style={styles.studentDeviceName}>Review payments</Text><Text style={styles.courseCardDescription}>Approve manual proofs, refund transactions, and activate enrollment.</Text></Pressable><Pressable style={styles.quickAction} onPress={() => setAdminView('Notifications')}><Bell color={colors.amber} size={22} /><Text style={styles.studentDeviceName}>Send broadcast</Text><Text style={styles.courseCardDescription}>Queue push and email announcements for students.</Text></Pressable></View></>}
 
-              {adminView === 'Revenue' && <View style={styles.pageStack}><View style={styles.pageHeader}><View><Text style={styles.panelTitle}>Revenue and accounting</Text><Text style={styles.pageSubtitle}>Completed income, refunds, wallet-funded purchases, and outstanding wallet liability.</Text></View><Button label="Export CSV" tone="secondary" icon={<Download color={colors.greenDark} size={16} />} onPress={() => setNotice('Filtered accounting CSV exported.')} /></View><View style={styles.actionRow}>{(['Today', 'This week', 'This month'] as const).map((range) => <Pressable key={range} onPress={() => setRevenueRange(range)} style={[styles.filterChip, revenueRange === range && styles.filterChipActive]}><Text style={[styles.filterChipText, revenueRange === range && styles.filterChipTextActive]}>{range}</Text></Pressable>)}<Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Custom range</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Course · All</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Teacher · All</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Plan · All</Text></Pressable></View><View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<DollarSign color={colors.green} size={20} />} label="Total revenue" value="447,000 IQD" note={revenueRange} /><Metric icon={<WalletCards color={colors.blue} size={20} />} label="Voucher-funded" value="89,000 IQD" note="20% of gross sales" /><Metric icon={<Building2 color={colors.amber} size={20} />} label="Wallet liability" value="18.4M IQD" note="Unspent student balances" /><Metric icon={<CreditCard color={colors.green} size={20} />} label="Purchases" value="3" note="2 active subscriptions" /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['Date', 'Course / plan', 'Teacher', 'Funding source', 'Amount', 'Status']} />{revenueRows.map((row, index) => <TableRow key={`${row.date}-${index}`} cells={[row.date, row.source, row.teacher, row.method, row.amount, row.status]} />)}</View></ScrollView></View>}
+              {adminView === 'Revenue' && <View style={styles.pageStack}><View style={styles.pageHeader}><View><Text style={styles.panelTitle}>Revenue and accounting</Text><Text style={styles.pageSubtitle}>Completed income, refunds, wallet-funded purchases, and outstanding wallet liability.</Text></View><Button label="Export CSV" tone="secondary" icon={<Download color={colors.greenDark} size={16} />} onPress={() => setNotice('Filtered accounting CSV exported.')} /></View><View style={styles.actionRow}>{(['Today', 'This week', 'This month'] as const).map((range) => <Pressable key={range} onPress={() => setRevenueRange(range)} style={[styles.filterChip, revenueRange === range && styles.filterChipActive]}><Text style={[styles.filterChipText, revenueRange === range && styles.filterChipTextActive]}>{range}</Text></Pressable>)}<Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Custom range</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Course · All</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Teacher · All</Text></Pressable><Pressable style={styles.filterChip}><Text style={styles.filterChipText}>Plan · All</Text></Pressable></View><View style={[styles.metricGrid, compact && styles.metricGridCompact]}><Metric icon={<DollarSign color={colors.green} size={20} />} label="Total revenue" value="728,250 IQD" note={revenueRange} /><Metric icon={<WalletCards color={colors.blue} size={20} />} label="Voucher-funded" value="89,000 IQD" note="12% of gross sales" /><Metric icon={<Building2 color={colors.amber} size={20} />} label="Wallet liability" value="18.4M IQD" note="Unspent student balances" /><Metric icon={<CreditCard color={colors.green} size={20} />} label="Purchases" value="6" note="5 gateway transactions" /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['Date', 'Course / plan', 'Teacher', 'Funding source', 'Amount', 'Status']} />{revenueRows.map((row, index) => <TableRow key={`${row.date}-${index}`} cells={[row.date, row.source, row.teacher, row.method, row.amount, row.status]} />)}</View></ScrollView></View>}
 
               {adminView === 'Users' && <View style={styles.pageStack}><View style={styles.searchBox}><Search color={colors.muted} size={18} /><TextInput onChangeText={setUserSearch} placeholder="Search by name, email, or user ID" placeholderTextColor={colors.subtle} style={styles.searchInput} value={userSearch} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['User', 'Email', 'Role', 'Wallet', 'Courses', 'Subscription']} />{filteredAdminUsers.map((user) => <Pressable key={user.id} onPress={() => setSelectedAdminUserId(user.id)}><TableRow cells={[`${user.name}\n${user.id}`, user.email, user.role, user.wallet, user.courses, user.subscription]} /></Pressable>)}</View></ScrollView>{selectedAdminUser && <View style={styles.profileDetailsCard}><View style={styles.pageHeader}><View><Text style={styles.panelEyebrow}>SELECTED USER</Text><Text style={styles.panelTitle}>{selectedAdminUser.name}</Text><Text style={styles.pageSubtitle}>{selectedAdminUser.email} · {selectedAdminUser.role}</Text></View><View style={styles.actionRow}><Button label="View profile" tone="secondary" onPress={() => setNotice(`Opened the admin profile for ${selectedAdminUser.name}.`)} /><Button label="Send password reset" icon={<KeyRound color={colors.white} size={16} />} onPress={() => setNotice(`Secure password reset email sent to ${selectedAdminUser.email}.`)} /></View></View><View style={styles.detailList}><Detail label="Wallet balance" value={selectedAdminUser.wallet} /><Detail label="Enrolled / purchased courses" value={selectedAdminUser.courses} /><Detail label="Subscription" value={selectedAdminUser.subscription} /></View></View>}<View style={styles.adminFooter}><ShieldCheck color={colors.blue} size={18} /><Text style={styles.adminFooterText}>Password reset sends the provider-managed recovery flow; admins never see or set a user’s raw password.</Text></View></View>}
 
@@ -1578,7 +1627,22 @@ function PrototypeExperience() {
                 <View style={styles.planRuleBanner}><ShieldCheck color={colors.green} size={18} /><Text style={styles.noticeText}>Custom multi-teacher mix: {pricingSystemConstraints.allowCustomMultiTeacherMix ? 'Allowed' : 'Disabled'} · Minimum bundle teacher payout: {formatIQD(pricingSystemConstraints.minimumBundleTeacherPayoutIQD)}</Text></View>
               </View>}
 
-              {adminView === 'Payments' && <View style={styles.listPanel}>{payments.map((payment) => <View key={payment.id} style={styles.paymentRow}><View style={styles.paymentIcon}><CreditCard color={colors.blue} size={20} /></View><View style={styles.notificationCopy}><View style={styles.userNameLine}><Text style={styles.studentDeviceName}>{payment.student}</Text><Pill label={payment.status} tone={payment.status === 'Pending' ? 'warning' : payment.status === 'Approved' ? 'success' : 'neutral'} /></View><Text style={styles.courseCardDescription}>{payment.course} · {payment.amount} · {payment.method}</Text><Text style={styles.studentDeviceMeta}>{payment.id}</Text></View><View style={styles.actionRow}>{payment.status === 'Pending' && <Button label="Approve" onPress={() => updatePayment(payment.id, 'Approved')} />}<Button label="Refund" tone="secondary" onPress={() => updatePayment(payment.id, 'Refunded')} /></View></View>)}</View>}
+              {adminView === 'Payments' && <View style={styles.pageStack}>
+                <View style={[styles.gatewayGrid, compact && styles.gatewayGridCompact]}>
+                  {paymentProviders.map((provider) => (
+                    <View key={provider.id} style={styles.providerAdminCard}>
+                      <View style={styles.courseCardTop}><Text style={styles.planName}>{provider.name}</Text><Pill label="Account required" tone="warning" /></View>
+                      <Text style={styles.courseCardDescription}>{provider.accountRequirement}</Text>
+                      <View style={styles.detailList}>
+                        <Detail label="Credentials" value={provider.credentials.join(', ')} />
+                        <Detail label="Confirmation" value={provider.supportsWebhook ? 'Webhook / callback' : 'Inquiry API'} />
+                        <Detail label="Customer handoff" value={provider.supportsRedirect ? 'Redirect' : 'QR or app link'} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.listPanel}>{payments.map((payment) => <View key={payment.id} style={styles.paymentRow}><View style={styles.paymentIcon}><CreditCard color={colors.blue} size={20} /></View><View style={styles.notificationCopy}><View style={styles.userNameLine}><Text style={styles.studentDeviceName}>{payment.student}</Text><Pill label={payment.status} tone={payment.status === 'Pending' ? 'warning' : payment.status === 'Approved' ? 'success' : 'neutral'} /></View><Text style={styles.courseCardDescription}>{payment.course} · {payment.amount} · {payment.method}</Text><Text style={styles.studentDeviceMeta}>{payment.id}</Text></View><View style={styles.actionRow}>{payment.status === 'Pending' && <Button label="Approve" onPress={() => updatePayment(payment.id, 'Approved')} />}<Button label="Refund" tone="secondary" onPress={() => updatePayment(payment.id, 'Refunded')} /></View></View>)}</View>
+              </View>}
 
               {adminView === 'Vouchers' && <View style={styles.pageStack}><View style={styles.pageHeader}><Text style={styles.pageSubtitle}>Voucher codes are shown once at creation; production stores only their SHA-256 hashes.</Text><Button label="Generate secure voucher" icon={<Plus color={colors.white} size={16} />} onPress={() => { setCoupons((current) => [{ code: `EL-DEMO-${String(current.length + 1).padStart(4, '0')}`, course: 'Wallet credit · 89,000 IQD', uses: '0 / 1', expires: '31 Dec 2026', status: 'Unused' }, ...current]); setNotice('Voucher generated. Copy it now; the raw code is never stored.'); }} /></View><ScrollView horizontal><View style={styles.table}><TableRow header cells={['One-time code', 'Value', 'Redemptions', 'Expires', 'Status']} />{coupons.map((coupon) => <TableRow key={coupon.code} cells={[coupon.code, coupon.course, coupon.uses, coupon.expires, coupon.status]} />)}</View></ScrollView></View>}
 
@@ -1695,7 +1759,9 @@ return StyleSheet.create({
   webAppBody: { alignItems: 'stretch', flexDirection: 'row' },
   backToLanding: { alignSelf: 'center', marginBottom: 16, paddingHorizontal: 12, paddingVertical: 8 },
   backToLandingText: { color: colors.greenDark, fontSize: 12, fontWeight: '800' },
-  loginShell: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: isIOS ? 20 : 24 },
+  loginScroll: { flex: 1 },
+  loginScrollContent: { flexGrow: 1 },
+  loginShell: { alignItems: 'center', flexGrow: 1, justifyContent: 'center', padding: isIOS ? 20 : 24 },
   loginBrand: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 18 },
   loginPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 20 : 8, borderWidth: isIOS ? 0 : 1, maxWidth: 520, padding: isIOS ? 20 : 26, width: '100%', ...(isIOS ? { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24 } : {}) },
   loginTitle: { color: colors.ink, fontSize: isIOS ? 34 : 28, fontWeight: isIOS ? '700' : '800', letterSpacing: isIOS ? 0.3 : 0, marginTop: 18 },
@@ -1757,7 +1823,7 @@ return StyleSheet.create({
   sidebarSignOutText: { color: '#F5F7F8', fontSize: 12, fontWeight: '800' },
   content: { alignSelf: 'center', maxWidth: 1200, paddingHorizontal: isIOS ? 16 : 24, paddingTop: isIOS ? 14 : 20, width: '100%' },
   webContent: { alignSelf: 'stretch', maxWidth: 1440, paddingHorizontal: 32, paddingTop: 30 },
-  discoverStack: { gap: 0 },
+  discoverStack: { gap: 18 },
   discoverHero: { backgroundColor: colors.greenSoft, marginHorizontal: isIOS ? -16 : -24, marginTop: isIOS ? -14 : -20, paddingBottom: 24, paddingHorizontal: isIOS ? 16 : 24, paddingTop: 24 },
   webDiscoverHero: { borderRadius: 12, marginHorizontal: 0, marginTop: 0, paddingHorizontal: 28 },
   discoverCatalogPill: { alignSelf: 'flex-start', marginTop: 16 },
@@ -1767,18 +1833,22 @@ return StyleSheet.create({
   discoverSubjectChip: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: 24, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 48, paddingHorizontal: 17 },
   discoverSubjectChipSelected: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
   discoverSubjectText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  discoverSection: { gap: 12, paddingTop: 22 },
-  discoverTeacherList: { backgroundColor: colors.white },
-  discoverTeacherRow: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 112, paddingHorizontal: 14, paddingVertical: 14 },
-  discoverTeacherRowSelected: { backgroundColor: colors.greenSoft, borderRadius: 9, minHeight: 140 },
-  discoverTeacherRowDivider: { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
-  discoverTeacherAvatarCompact: { borderRadius: 20, height: 40, width: 40 },
-  discoverSelectedCheck: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 21, height: 42, justifyContent: 'center', width: 42 },
+  discoverSection: { gap: 10 },
+  discoverTeacherList: { gap: 8 },
+  discoverTeacherRow: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 88, paddingHorizontal: 14, paddingVertical: 12 },
+  discoverTeacherRowSelected: { backgroundColor: colors.greenSoft, borderColor: '#9cc8b4' },
+  discoverTeacherRowDivider: {},
+  discoverTeacherAvatarCompact: { borderRadius: 21, height: 42, width: 42 },
+  discoverTeacherBio: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  discoverSelectedCheck: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   discoverCourseList: { gap: 10 },
-  discoverCourseRow: { alignItems: 'flex-start', backgroundColor: colors.white, borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 14, paddingHorizontal: 4, paddingTop: 16 },
-  discoverCourseIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: 10, height: 72, justifyContent: 'center', width: 72 },
-  discoverCourseCopy: { flex: 1, gap: 3, minWidth: 0 },
-  discoverCourseActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  discoverCourseRow: { alignItems: 'flex-start', backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 8, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', flexWrap: 'wrap', gap: 14, padding: isIOS ? 16 : 14 },
+  discoverCourseRowCompact: { flexDirection: 'column' },
+  discoverCourseIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: isIOS ? 10 : 8, flexShrink: 0, height: 58, justifyContent: 'center', width: 58 },
+  discoverCourseCopy: { flex: 1, gap: 2, minWidth: 220 },
+  discoverCourseCopyCompact: { minWidth: 0, width: '100%' },
+  discoverCourseDescription: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  discoverCourseActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   pageStack: { gap: isIOS ? 20 : 22 },
   sectionBlock: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, gap: 14, padding: isIOS ? 16 : 18 },
   choiceRow: { gap: 10, paddingTop: 12 },
@@ -1796,6 +1866,7 @@ return StyleSheet.create({
   planGrid: { alignItems: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   planGridCompact: { flexDirection: 'column' },
   planCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 16 : 9, borderWidth: isIOS ? 0 : 1, flex: 1, gap: 14, minWidth: 235, padding: isIOS ? 18 : 20 },
+  planCardPopular: { backgroundColor: '#fff8e8', borderColor: '#d39a2c', borderWidth: 2, shadowColor: '#a9782d', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.14, shadowRadius: 18 },
   planCardVip: { backgroundColor: colors.charcoal, borderColor: colors.charcoal },
   planName: { color: colors.ink, fontSize: 13, fontWeight: '900' },
   planPrice: { color: colors.ink, fontSize: 24, fontWeight: '900' },
@@ -1820,6 +1891,20 @@ return StyleSheet.create({
   pathChoiceTextSelected: { color: colors.white },
   adminPlanCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, minWidth: 280, padding: isIOS ? 16 : 18 },
   uploadBox: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 14 : 7, borderStyle: 'dashed', borderWidth: isIOS ? 0 : 1, gap: 5, marginVertical: 14, padding: 24 },
+  gatewayStack: { gap: 12, marginVertical: 14 },
+  gatewayGrid: { alignItems: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gatewayGridCompact: { flexDirection: 'column' },
+  gatewayOption: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 12 : 7, borderWidth: 1, flex: 1, gap: 7, minWidth: 150, padding: 12 },
+  gatewayOptionSelected: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  gatewayOptionTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  gatewayLogoTile: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: 'rgba(180, 186, 194, 0.44)', borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, height: 30, justifyContent: 'center', overflow: 'hidden', padding: 4, width: 30 },
+  gatewayLogoImage: { height: '100%', width: '100%' },
+  gatewayName: { color: colors.ink, fontSize: 12, fontWeight: '900' },
+  gatewayNameSelected: { color: colors.white },
+  gatewayMeta: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  gatewayMetaSelected: { color: colors.greenSoft },
+  gatewaySummary: { backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 12 : 7, borderWidth: isIOS ? 0 : 1, gap: 5, padding: 14 },
+  providerAdminCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, gap: 12, minWidth: 260, padding: isIOS ? 16 : 18 },
   walletCheckout: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: 8, flexDirection: 'row', gap: 12, marginVertical: 16, padding: 14 },
   walletHero: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 16 : 9, borderWidth: isIOS ? 0 : 1, flex: 1, gap: 12, padding: 22 },
   walletBalance: { color: colors.ink, fontSize: 32, fontWeight: '900' },
@@ -1893,18 +1978,13 @@ return StyleSheet.create({
   lessonAction: { alignItems: 'flex-end', minWidth: 58 },
   courseLayout: { alignItems: 'stretch', flexDirection: 'row', gap: 16 },
   courseLayoutCompact: { flexDirection: 'column' },
-  playerPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1.65, overflow: 'hidden' },
-  videoFrame: { aspectRatio: 16 / 9, backgroundColor: colors.charcoal, overflow: 'hidden', position: 'relative' },
+  playerPanel: { flex: 1.65 },
+  videoFrame: { aspectRatio: 16 / 9, backgroundColor: '#1c1a1a', overflow: 'hidden', position: 'relative' },
   video: { height: '100%', width: '100%' },
   videoGate: { alignItems: 'center', backgroundColor: 'rgba(17, 25, 22, 0.93)', bottom: 0, justifyContent: 'center', left: 0, padding: 22, position: 'absolute', right: 0, top: 0 },
   videoGateIcon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
   videoGateTitle: { color: colors.white, fontSize: 20, fontWeight: '800', marginTop: 14 },
   videoGateText: { color: '#b8c3bf', fontSize: 12, lineHeight: 18, marginBottom: 16, marginTop: 5, maxWidth: 360, textAlign: 'center' },
-  playerControls: { alignItems: 'center', flexDirection: 'row', gap: 12, minHeight: 72, padding: 13 },
-  roundControl: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
-  playerControlCopy: { flex: 1 },
-  playerState: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  playerMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
   sessionPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, padding: isIOS ? 16 : 18 },
   nextLessonPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 12, borderWidth: isIOS ? 0 : 1, flex: 1, padding: isIOS ? 16 : 18 },
   nextLessonHero: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: 22, height: 44, justifyContent: 'center', marginBottom: 16, width: 44 },
