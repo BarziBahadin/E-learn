@@ -40,6 +40,11 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "web:demo": "EXPO_PUBLIC_APP_MODE=demo EXPO_PUBLIC_ENABLE_DEMO_APP=true expo start --web",
+    "build:preview": "eas build --profile preview",
+    "build:production": "eas build --profile production",
+    "submit:production": "eas submit --profile production",
+    "validate:production-env": "EAS_BUILD_PROFILE=production node scripts/validate-build-environment.cjs",
+    "eas-build-pre-install": "node scripts/validate-build-environment.cjs",
     "typecheck": "node --stack_size=65500 ./node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run"
   },

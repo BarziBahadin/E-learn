@@ -3,15 +3,21 @@
     "name": "E-Lern",
     "slug": "E-Lern",
     "version": "1.0.0",
+    "scheme": "e-lern",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.E-Lern"
+      "bundleIdentifier": "com.barzy.elern",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.barzy.elern",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

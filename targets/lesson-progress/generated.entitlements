@@ -4,7 +4,7 @@
   <dict>
     <key>com.apple.security.application-groups</key>
     <array>
-      <string>group.com.anonymous.E-Lern</string>
+      <string>group.com.barzy.elern</string>
     </array>
   </dict>
 </plist>

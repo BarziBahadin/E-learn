@@ -165,6 +165,14 @@ async function startPlayback(userId: string, body: JsonRecord, req: Request) {
   const courseId = requiredString(body.course_id, 'course_id');
   const fingerprint = await requestFingerprint(req);
 
+  if (!await isPlaybackAuthorized(userId, courseId, lessonId)) {
+    await logRiskEvent(userId, deviceId, null, 'entitlement_denied', 'medium', {
+      course_id: courseId,
+      lesson_id: lessonId,
+    }, fingerprint);
+    return { status: 'blocked', reason: 'entitlement_required' };
+  }
+
   const device = await ensureDeviceUsable(userId, deviceId);
 
   if (!device.ok) {
@@ -333,6 +341,15 @@ async function forceSwitch(userId: string, body: JsonRecord, req: Request) {
   const lessonId = requiredString(body.lesson_id, 'lesson_id');
   const courseId = requiredString(body.course_id, 'course_id');
   const fingerprint = await requestFingerprint(req);
+
+  if (!await isPlaybackAuthorized(userId, courseId, lessonId)) {
+    await logRiskEvent(userId, newDeviceId, null, 'entitlement_denied', 'medium', {
+      action: 'force_switch',
+      course_id: courseId,
+      lesson_id: lessonId,
+    }, fingerprint);
+    return { status: 'blocked', reason: 'entitlement_required' };
+  }
 
   const device = await ensureDeviceUsable(userId, newDeviceId);
 
@@ -814,6 +831,16 @@ async function rpc(name: string, payload: JsonRecord) {
   }
 
   return data;
+}
+
+async function isPlaybackAuthorized(userId: string, courseId: string, lessonId: string) {
+  const result = await rpc('authorize_lesson_playback', {
+    p_user_id: userId,
+    p_course_id: courseId,
+    p_lesson_id: lessonId,
+  });
+
+  return result === true;
 }
 
 async function readJson(req: Request) {

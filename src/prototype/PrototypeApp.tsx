@@ -361,6 +361,7 @@ function PrototypeExperience() {
   const [selectedAdminUserId, setSelectedAdminUserId] = useState(adminUsers[0].id);
 
   const videoPlayerRef = useRef<LessonVideoPlayerHandle>(null);
+  const appScrollRef = useRef<ScrollView>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const activeLock = currentUser ? state.locks[currentUser.id] : undefined;
@@ -402,6 +403,24 @@ function PrototypeExperience() {
     pathIndex: selectedPricingPathIndex,
     standaloneSubject: checkoutCourse.category as AcademicSubject,
   });
+  const completedEnrolledLessonCount = useMemo(() => {
+    const enrolledLessonIds = new Set(
+      studentCourses
+        .filter((course) => enrolledCourseIds.includes(course.id))
+        .flatMap(courseLessons)
+        .map((lesson) => lesson.id),
+    );
+    return completedLessonIds.filter((lessonId) => enrolledLessonIds.has(lessonId)).length;
+  }, [completedLessonIds, enrolledCourseIds]);
+
+  const navigateTo = useCallback((nextPage: Page) => {
+    setNotice('');
+    setPage(nextPage);
+  }, []);
+
+  useEffect(() => {
+    appScrollRef.current?.scrollTo({ animated: false, y: 0 });
+  }, [page]);
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -880,7 +899,7 @@ function PrototypeExperience() {
   const userInitials = currentUser.name.split(' ').map((part) => part[0]).join('').slice(0, 2);
   const desktopWeb = Platform.OS === 'web' && width >= 920;
   const roleNavigation: Page[] = currentUser.role === 'student'
-    ? (desktopWeb ? ['Discover', 'Courses', 'Plans', 'Wallet', 'Notifications', 'Status', 'Profile'] : isIOS ? ['Discover', 'Courses', 'Plans', 'Wallet', 'Profile'] : ['Discover', 'Courses', 'Plans', 'Wallet'])
+    ? (desktopWeb ? ['Discover', 'Courses', 'Plans', 'Wallet', 'Notifications', 'Status', 'Profile'] : isIOS ? ['Discover', 'Courses', 'Plans', 'Wallet', 'Profile'] : ['Discover', 'Courses', 'Plans', 'Wallet', 'Notifications', 'Profile'])
     : currentUser.role === 'parent'
       ? ['Guardian', 'Profile']
     : currentUser.role === 'teacher'
@@ -909,7 +928,7 @@ function PrototypeExperience() {
     (courseItem) => courseItem.category.toLowerCase() === selectedSubjectId,
   );
   const profileTrigger = (
-    <Pressable accessibilityLabel={translate('Open profile')} accessibilityRole="button" onPress={() => setPage('Profile')} style={({ pressed }) => [styles.profileTrigger, desktopWeb && styles.webProfileTrigger, pressed && styles.pressed]}>
+    <Pressable accessibilityLabel={translate('Open profile')} accessibilityRole="button" onPress={() => navigateTo('Profile')} style={({ pressed }) => [styles.profileTrigger, desktopWeb && styles.webProfileTrigger, pressed && styles.pressed]}>
       <View style={styles.avatar}><Text style={styles.avatarText}>{userInitials}</Text></View>
       <View style={styles.profileTriggerCopy}>
         <Text numberOfLines={1} style={styles.profileTriggerName}>{currentUser.name}</Text>
@@ -941,7 +960,7 @@ function PrototypeExperience() {
       <NativeTabShell
         activeKey={activeNavigationPage}
         disabled={desktopWeb}
-        onSelect={(key) => setPage(key as Page)}
+        onSelect={(key) => navigateTo(key as Page)}
         routes={tabRoutes}
       >
       <View style={[styles.appBody, desktopWeb && styles.webAppBody]}>
@@ -956,7 +975,7 @@ function PrototypeExperience() {
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
                     key={item}
-                    onPress={() => setPage(item)}
+                    onPress={() => navigateTo(item)}
                     style={({ pressed }) => [styles.webNavItem, active && styles.webNavItemActive, pressed && styles.pressed]}
                   >
                     <View style={[styles.webNavIcon, active && styles.webNavIconActive]}>{navigationIcon(item, active, colors)}</View>
@@ -979,7 +998,7 @@ function PrototypeExperience() {
           </View>
         )}
 
-        <ScrollView style={[styles.scroll, desktopWeb && styles.webMainScroll]} contentContainerStyle={[styles.scrollContent, desktopWeb && styles.webScrollContent]}>
+        <ScrollView ref={appScrollRef} style={[styles.scroll, desktopWeb && styles.webMainScroll]} contentContainerStyle={[styles.scrollContent, desktopWeb && styles.webScrollContent]}>
           <View style={[styles.content, desktopWeb && styles.webContent]}>
           {notice ? (
             <View style={styles.noticeBar}>
@@ -1073,15 +1092,17 @@ function PrototypeExperience() {
                     const enrolled = enrolledCourseIds.includes(courseItem.id);
                     return (
                       <View key={courseItem.id} style={[styles.discoverCourseRow, compact && styles.discoverCourseRowCompact]}>
-                        <View style={styles.discoverCourseIcon}><CourseCategoryIcon category={courseItem.category} size={26} /></View>
-                        <View style={[styles.discoverCourseCopy, compact && styles.discoverCourseCopyCompact]}>
-                          <Text numberOfLines={2} style={styles.courseCardTitle}>{courseItem.title}</Text>
-                          <Text numberOfLines={2} style={styles.courseCardInstructor}>by {courseItem.instructors.join(', ')}</Text>
-                          <Text numberOfLines={2} style={styles.discoverCourseDescription}>{courseItem.description}</Text>
-                          <View style={styles.discoverCourseActions}>
-                            <Button label="Free preview" tone="secondary" onPress={() => previewCourse(courseItem)} />
-                            <Button label={enrolled ? 'Open course' : 'Unlock course'} onPress={() => enrolled ? openCourse(courseItem) : openCheckout(courseItem.id)} />
+                        <View style={styles.discoverCourseMain}>
+                          <View style={styles.discoverCourseIcon}><CourseCategoryIcon category={courseItem.category} size={26} /></View>
+                          <View style={[styles.discoverCourseCopy, compact && styles.discoverCourseCopyCompact]}>
+                            <Text numberOfLines={2} style={styles.discoverCourseTitle}>{courseItem.title}</Text>
+                            <Text numberOfLines={2} style={styles.discoverCourseInstructor}>by {courseItem.instructors.join(', ')}</Text>
+                            <Text numberOfLines={2} style={styles.discoverCourseDescription}>{courseItem.description}</Text>
                           </View>
+                        </View>
+                        <View style={[styles.discoverCourseActions, compact && styles.discoverCourseActionsCompact]}>
+                          <Button label="Free preview" tone="secondary" onPress={() => previewCourse(courseItem)} />
+                          <Button label={enrolled ? 'Open course' : 'Unlock course'} onPress={() => enrolled ? openCourse(courseItem) : openCheckout(courseItem.id)} />
                         </View>
                       </View>
                     );
@@ -1094,7 +1115,7 @@ function PrototypeExperience() {
           {page === 'Plans' && currentUser.role === 'student' && (
             <View style={styles.pageStack}>
               <View style={styles.pageHeader}>
-                <View>
+                <View style={styles.pageHeaderCopy}>
                   <Text style={styles.overline}>ACADEMIC-YEAR ACCESS</Text>
                   <Text style={styles.pageTitle}>Choose your plan</Text>
                   <Text style={styles.pageSubtitle}>{ACADEMIC_YEAR_ACCESS_MODEL}</Text>
@@ -1137,7 +1158,7 @@ function PrototypeExperience() {
           {page === 'Checkout' && currentUser.role === 'student' && (
             <View style={styles.pageStack}>
               <View style={styles.breadcrumbRow}><Pressable onPress={() => setPage('Plans')}><Text style={styles.breadcrumbLink}>Plans</Text></Pressable><ChevronRight color={colors.subtle} size={14} /><Text style={styles.breadcrumbCurrent}>Activate academic-year access</Text></View>
-              <View style={styles.pageHeader}><View><Text style={styles.overline}>SECURE ACADEMIC-YEAR ACCESS</Text><Text style={styles.pageTitle}>Choose and activate your plan</Text><Text style={styles.pageSubtitle}>One payment covers access through the August/September ministerial resits.</Text></View><Pill label={formatIQD(selectedPricingPlan.retailPriceIQD)} tone="warning" /></View>
+              <View style={styles.pageHeader}><View style={styles.pageHeaderCopy}><Text style={styles.overline}>SECURE ACADEMIC-YEAR ACCESS</Text><Text style={styles.pageTitle}>Choose and activate your plan</Text><Text style={styles.pageSubtitle}>One payment covers access through the August/September ministerial resits.</Text></View><Pill label={formatIQD(selectedPricingPlan.retailPriceIQD)} tone="warning" /></View>
               <View style={styles.planChoiceGrid}>
                 {pricingPlans.map((plan) => {
                   const selected = selectedPricingPlanId === plan.id;
@@ -1181,7 +1202,7 @@ function PrototypeExperience() {
                   <View style={styles.pathChoiceGrid}>
                     {studentCourses.map((course) => {
                       const selected = checkoutCourseId === course.id;
-                      return <Pressable accessibilityState={{ selected }} key={course.id} onPress={() => setCheckoutCourseId(course.id)} style={[styles.pathChoice, selected && styles.pathChoiceSelected]}><Check color={selected ? colors.white : colors.green} size={17} /><Text style={[styles.pathChoiceText, selected && styles.pathChoiceTextSelected]}>{course.title}</Text></Pressable>;
+                      return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} key={course.id} onPress={() => setCheckoutCourseId(course.id)} style={[styles.pathChoice, selected && styles.pathChoiceSelected]}>{selected ? <Check color={colors.white} size={17} /> : <View style={styles.choiceIndicator} />}<Text style={[styles.pathChoiceText, selected && styles.pathChoiceTextSelected]}>{course.title}</Text></Pressable>;
                     })}
                   </View>
                 </View>
@@ -1234,7 +1255,7 @@ function PrototypeExperience() {
           {page === 'Courses' && currentUser.role === 'student' && (
             <View style={styles.pageStack}>
               <View style={styles.pageHeader}>
-                <View>
+                <View style={styles.pageHeaderCopy}>
                   <Text style={styles.overline}>STUDENT WORKSPACE</Text>
                   <Text style={styles.pageTitle}>My courses</Text>
                   <Text style={styles.pageSubtitle}>Continue an enrolled course or open its chapters and lessons.</Text>
@@ -1244,7 +1265,7 @@ function PrototypeExperience() {
 
               <View style={[styles.metricGrid, compact && styles.metricGridCompact]}>
                 <Metric icon={<GraduationCap color={colors.green} size={20} />} label="Enrolled" value={`${enrolledCourseIds.length} courses`} note="Current term" />
-                <Metric icon={<Check color={colors.blue} size={20} />} label="Lessons complete" value={String(completedLessonIds.length)} note="Across all courses" />
+                <Metric icon={<Check color={colors.blue} size={20} />} label="Lessons complete" value={String(completedEnrolledLessonCount)} note="In enrolled courses" />
                 <Metric icon={<Clock3 color={colors.amber} size={20} />} label="Learning time" value="12h 35m" note="This month" />
                 <Metric icon={<ShieldCheck color={colors.green} size={20} />} label="Secure sessions" value={String(state.playback_sessions.length)} note="Playback audit history" />
               </View>
@@ -1376,7 +1397,7 @@ function PrototypeExperience() {
                 <Text style={styles.breadcrumbCurrent}>{selectedLesson.title}</Text>
               </View>
               <View style={styles.pageHeader}>
-                <View>
+                <View style={styles.pageHeaderCopy}>
                   <Text style={styles.overline}>{selectedChapter?.title ?? 'COURSE LESSON'}</Text>
                   <Text style={styles.pageTitle}>{selectedLesson.title}</Text>
                   <Text style={styles.pageSubtitle}>{selectedCourse.title} · {selectedLesson.type} · {selectedLesson.duration}</Text>
@@ -1430,6 +1451,34 @@ function PrototypeExperience() {
                   </Pressable>
                 </View>
               </View>
+
+              <View style={styles.learningToolsPanel}>
+                <View style={styles.learningToolsHeader}>
+                  <View style={styles.pageHeaderCopy}>
+                    <Text style={styles.panelEyebrow}>LESSON TOOLKIT</Text>
+                    <Text style={styles.panelTitle}>Learn actively, not just by watching</Text>
+                    <Text style={styles.pageSubtitle}>Read along, save a study note, or check your understanding.</Text>
+                  </View>
+                  <Pill label="Study tools" tone="success" />
+                </View>
+                <View style={[styles.learningToolGrid, compact && styles.learningToolGridCompact]}>
+                  <Pressable accessibilityRole="button" onPress={() => setNotice('Lesson transcript opened. Follow the explanation while the video plays.')} style={({ pressed }) => [styles.learningTool, pressed && styles.pressed]}>
+                    <BookOpen color={colors.green} size={21} />
+                    <Text style={styles.learningToolTitle}>Transcript</Text>
+                    <Text style={styles.learningToolText}>Read along and revisit key explanations.</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => setNotice('Study note saved for this lesson.')} style={({ pressed }) => [styles.learningTool, pressed && styles.pressed]}>
+                    <ListChecks color={colors.blue} size={21} />
+                    <Text style={styles.learningToolTitle}>Study notes</Text>
+                    <Text style={styles.learningToolText}>Capture formulas, definitions, and questions.</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => setNotice('Knowledge check opened with 5 practice questions.')} style={({ pressed }) => [styles.learningTool, pressed && styles.pressed]}>
+                    <Check color={colors.amber} size={21} />
+                    <Text style={styles.learningToolTitle}>Knowledge check</Text>
+                    <Text style={styles.learningToolText}>Answer five questions before continuing.</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
           )}
 
@@ -1437,7 +1486,7 @@ function PrototypeExperience() {
             <View style={styles.pageStack}>
               <View style={styles.pageHeader}><View><Text style={styles.overline}>STUDENT WALLET</Text><Text style={styles.pageTitle}>Balance and vouchers</Text><Text style={styles.pageSubtitle}>Redeem a secure voucher, then use your balance for eligible courses and plans.</Text></View><Pill label={formatIQD(walletBalance)} tone="success" /></View>
               <View style={[styles.checkoutLayout, compact && styles.courseLayoutCompact]}>
-                <View style={styles.walletHero}><WalletCards color={colors.green} size={30} /><Text style={styles.panelEyebrow}>AVAILABLE BALANCE</Text><Text style={styles.walletBalance}>{formatIQD(walletBalance)}</Text><Text style={styles.pageSubtitle}>Wallet liability remains tracked until funds are spent or refunded.</Text><Button label="Browse plans" onPress={() => setPage('Plans')} /></View>
+                <View style={styles.walletHero}><WalletCards color={colors.green} size={30} /><Text style={styles.panelEyebrow}>AVAILABLE BALANCE</Text><Text style={styles.walletBalance}>{formatIQD(walletBalance)}</Text><Text style={styles.pageSubtitle}>Use this credit for eligible courses and academic-year plans.</Text><Button label="Browse plans" onPress={() => navigateTo('Plans')} /></View>
                 <View style={styles.sectionBlock}><Text style={styles.panelTitle}>Redeem a voucher</Text><Text style={styles.pageSubtitle}>Validation and redemption run only on the server in one locked database transaction.</Text><Text style={styles.fieldLabel}>Voucher code</Text><TextInput autoCapitalize="characters" autoCorrect={false} onChangeText={setVoucherCode} placeholder="EL-XXXX-XXXX" placeholderTextColor={colors.subtle} style={styles.textInput} value={voucherCode} /><Button label="Redeem voucher" icon={<TicketCheck color={colors.white} size={17} />} onPress={redeemVoucher} /></View>
               </View>
               <View style={styles.listPanel}>
@@ -1493,7 +1542,7 @@ function PrototypeExperience() {
                   <View style={styles.profileSectionTitle}><GraduationCap color={colors.green} size={20} /><View><Text style={styles.panelTitle}>Account overview</Text><Text style={styles.pageSubtitle}>Information related to your role.</Text></View></View>
                   <View style={styles.detailList}>
                     {currentUser.role === 'student' && <Detail label="Enrolled courses" value={String(enrolledCourseIds.length)} />}
-                    {currentUser.role === 'student' && <Detail label="Completed lessons" value={String(completedLessonIds.length)} />}
+                    {currentUser.role === 'student' && <Detail label="Completed lessons" value={String(completedEnrolledLessonCount)} />}
                     {currentUser.role === 'teacher' && <Detail label="Teaching" value="Grade 12 Physics" />}
                     {currentUser.role === 'teacher' && <Detail label="Students" value="842" />}
                     {currentUser.role === 'admin' && <Detail label="Access" value="Platform administration" />}
@@ -1839,16 +1888,20 @@ return StyleSheet.create({
   discoverTeacherRowSelected: { backgroundColor: colors.greenSoft, borderColor: '#9cc8b4' },
   discoverTeacherRowDivider: {},
   discoverTeacherAvatarCompact: { borderRadius: 21, height: 42, width: 42 },
-  discoverTeacherBio: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  discoverTeacherBio: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2 },
   discoverSelectedCheck: { alignItems: 'center', backgroundColor: colors.greenDark, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   discoverCourseList: { gap: 10 },
-  discoverCourseRow: { alignItems: 'flex-start', backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 8, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', flexWrap: 'wrap', gap: 14, padding: isIOS ? 16 : 14 },
-  discoverCourseRowCompact: { flexDirection: 'column' },
-  discoverCourseIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: isIOS ? 10 : 8, flexShrink: 0, height: 58, justifyContent: 'center', width: 58 },
-  discoverCourseCopy: { flex: 1, gap: 2, minWidth: 220 },
+  discoverCourseRow: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 16 : 10, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', gap: 22, padding: isIOS ? 18 : 20 },
+  discoverCourseRowCompact: { alignItems: 'stretch', flexDirection: 'column', gap: 16, padding: 16 },
+  discoverCourseMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 16, minWidth: 0 },
+  discoverCourseIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: isIOS ? 12 : 10, flexShrink: 0, height: 64, justifyContent: 'center', width: 64 },
+  discoverCourseCopy: { flex: 1, gap: 4, minWidth: 220 },
   discoverCourseCopyCompact: { minWidth: 0, width: '100%' },
-  discoverCourseDescription: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
-  discoverCourseActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  discoverCourseTitle: { color: colors.ink, fontSize: isIOS ? 20 : 18, fontWeight: '800', lineHeight: isIOS ? 25 : 23 },
+  discoverCourseInstructor: { color: colors.green, fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  discoverCourseDescription: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 2 },
+  discoverCourseActions: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, gap: 10 },
+  discoverCourseActionsCompact: { alignItems: 'stretch', alignSelf: 'stretch', flexWrap: 'wrap' },
   pageStack: { gap: isIOS ? 20 : 22 },
   sectionBlock: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, gap: 14, padding: isIOS ? 16 : 18 },
   choiceRow: { gap: 10, paddingTop: 12 },
@@ -1870,13 +1923,13 @@ return StyleSheet.create({
   planCardVip: { backgroundColor: colors.charcoal, borderColor: colors.charcoal },
   planName: { color: colors.ink, fontSize: 13, fontWeight: '900' },
   planPrice: { color: colors.ink, fontSize: 24, fontWeight: '900' },
-  planUnlocks: { color: colors.muted, fontSize: 11, lineHeight: 17 },
+  planUnlocks: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   planTextVip: { color: colors.white },
   planTextVipMuted: { color: '#b8c3bf' },
   planPaths: { gap: 7 },
   planPathChip: { backgroundColor: colors.greenSoft, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 },
   planPathChipVip: { backgroundColor: 'rgba(255,255,255,0.09)' },
-  planPathText: { color: colors.greenDark, fontSize: 10, fontWeight: '800', lineHeight: 15 },
+  planPathText: { color: colors.greenDark, fontSize: 11, fontWeight: '800', lineHeight: 16 },
   planRuleBanner: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 12 : 7, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', gap: 10, padding: 14 },
   planChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   planChoice: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 12 : 7, borderWidth: 1, flex: 1, gap: 5, minWidth: 145, padding: 14 },
@@ -1887,6 +1940,7 @@ return StyleSheet.create({
   pathChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   pathChoice: { alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 12 : 7, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 48, paddingHorizontal: 14 },
   pathChoiceSelected: { backgroundColor: colors.greenDark, borderColor: colors.greenDark },
+  choiceIndicator: { borderColor: colors.border, borderRadius: 9, borderWidth: 1, height: 18, width: 18 },
   pathChoiceText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
   pathChoiceTextSelected: { color: colors.white },
   adminPlanCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, minWidth: 280, padding: isIOS ? 16 : 18 },
@@ -1920,18 +1974,19 @@ return StyleSheet.create({
   guardianFooter: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   noticeBar: { alignItems: 'center', backgroundColor: colors.blueSoft, borderColor: '#cadbea', borderRadius: isIOS ? 12 : 6, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', gap: 9, marginBottom: 20, minHeight: isIOS ? 44 : 42, paddingHorizontal: 12 },
   noticeText: { color: '#244f7d', flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 18 },
-  pageHeader: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between' },
+  pageHeader: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', minWidth: 0 },
+  pageHeaderCopy: { flex: 1, minWidth: 0 },
   overline: { color: colors.green, fontSize: 10, fontWeight: '800', letterSpacing: 0 },
-  pageTitle: { color: colors.ink, fontSize: isIOS ? 34 : 27, fontWeight: isIOS ? '700' : '800', letterSpacing: isIOS ? 0.3 : 0, marginTop: 6 },
-  pageSubtitle: { color: colors.muted, fontSize: isIOS ? 15 : 13, lineHeight: isIOS ? 22 : 20, marginTop: 4 },
+  pageTitle: { color: colors.ink, flexShrink: 1, fontSize: isIOS ? 34 : 27, fontWeight: isIOS ? '700' : '800', letterSpacing: isIOS ? 0.3 : 0, marginTop: 6 },
+  pageSubtitle: { color: colors.muted, flexShrink: 1, fontSize: isIOS ? 15 : 14, lineHeight: isIOS ? 22 : 21, marginTop: 4 },
   courseGrid: { flexDirection: 'row', gap: 14 },
   courseGridCompact: { flexDirection: 'column' },
   courseCard: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flex: 1, gap: 12, minWidth: 0, padding: isIOS ? 16 : 18 },
   courseCardTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   courseCategoryIcon: { alignItems: 'center', backgroundColor: colors.greenSoft, borderRadius: isIOS ? 10 : 7, height: 44, justifyContent: 'center', width: 44 },
   courseCardTitle: { color: colors.ink, fontSize: isIOS ? 20 : 18, fontWeight: isIOS ? '700' : '800', lineHeight: isIOS ? 25 : 23 },
-  courseCardInstructor: { color: colors.green, fontSize: 11, fontWeight: '700', marginTop: -7 },
-  courseCardDescription: { color: colors.muted, fontSize: isIOS ? 13 : 11, lineHeight: isIOS ? 19 : 17, minHeight: 52 },
+  courseCardInstructor: { color: colors.green, fontSize: 12, fontWeight: '700', marginTop: -5 },
+  courseCardDescription: { color: colors.muted, fontSize: isIOS ? 13 : 12, lineHeight: isIOS ? 19 : 18, minHeight: 52 },
   courseStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   courseStat: { color: colors.muted, fontSize: 10, fontWeight: '600' },
   progressHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -2000,6 +2055,13 @@ return StyleSheet.create({
   nextLessonCopy: { flex: 1 },
   nextLessonLabel: { color: colors.muted, fontSize: 9, fontWeight: '800' },
   nextLessonTitle: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  learningToolsPanel: { backgroundColor: colors.white, borderColor: colors.border, borderRadius: isIOS ? 14 : 12, borderWidth: isIOS ? 0 : 1, padding: isIOS ? 16 : 18 },
+  learningToolsHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 16, justifyContent: 'space-between' },
+  learningToolGrid: { flexDirection: 'row', gap: 12, marginTop: 18 },
+  learningToolGridCompact: { flexDirection: 'column' },
+  learningTool: { backgroundColor: colors.canvas, borderColor: colors.border, borderRadius: 10, borderWidth: 1, flex: 1, gap: 6, minHeight: 116, padding: 14 },
+  learningToolTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  learningToolText: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   conflictBanner: { alignItems: 'center', backgroundColor: colors.amberSoft, borderColor: '#ecd29e', borderRadius: isIOS ? 14 : 7, borderWidth: isIOS ? 0 : 1, flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20, padding: 14 },
   conflictIcon: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
   conflictCopy: { flex: 1, minWidth: 220 },
